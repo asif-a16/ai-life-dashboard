@@ -4,7 +4,9 @@ import { TopNav } from '@/components/layout/TopNav'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TodayHabitChecklist } from '@/components/habits/TodayHabitChecklist'
 import { RecentLogList } from '@/components/logging/RecentLogList'
-import type { Habit, HabitLog, HabitWithLog, LogEntryRow } from '@/lib/types'
+import { InsightCard } from '@/components/insights/InsightCard'
+import { computeDashboardStats } from '@/lib/ai/computeStats'
+import type { Habit, HabitLog, HabitWithLog, InsightCache, LogEntryRow } from '@/lib/types'
 
 function computeStreak(habitId: string, logs: HabitLog[]): number {
   const habitLogs = logs
@@ -43,10 +45,10 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   const today = new Date().toISOString().split('T')[0]
-
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const cutoff = sevenDaysAgo.toISOString().split('T')[0]
+  const twentyFourHoursAgo = new Date(new Date().getTime() - 24 * 60 * 60 * 1000).toISOString()
 
   const [
     { data: profile },
@@ -54,6 +56,8 @@ export default async function DashboardPage() {
     { data: habits },
     { data: logs },
     { data: todayLogs },
+    stats,
+    { data: cachedInsight },
   ] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user!.id).single(),
     supabase
@@ -79,7 +83,27 @@ export default async function DashboardPage() {
       .select('habit_id')
       .eq('user_id', user!.id)
       .eq('completed_on', today),
+    computeDashboardStats(user!.id, supabase),
+    supabase
+      .from('insights_cache')
+      .select('*')
+      .eq('user_id', user!.id)
+      .eq('period_end', today)
+      .gte('created_at', twentyFourHoursAgo)
+      .single(),
   ])
+
+  // Check if insight is stale (new entries added after last generation)
+  let isStale = false
+  if (cachedInsight) {
+    const { data: newerEntries } = await supabase
+      .from('log_entries')
+      .select('id')
+      .eq('user_id', user!.id)
+      .gt('created_at', cachedInsight.created_at)
+      .limit(1)
+    isStale = (newerEntries?.length ?? 0) > 0
+  }
 
   const displayName = profile?.display_name || user?.email?.split('@')[0] || 'there'
   const completedTodayIds = new Set((todayLogs ?? []).map((l: { habit_id: string }) => l.habit_id))
@@ -130,9 +154,11 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Weekly Insight</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Insight generation coming soon. Log more entries to unlock your weekly summary.
-            </p>
+            <InsightCard
+              stats={stats}
+              initialInsight={cachedInsight as InsightCache | null}
+              isStale={isStale}
+            />
           </CardContent>
         </Card>
       </div>
