@@ -1,13 +1,17 @@
 # Session Summary — AI Life Dashboard
 
-## Completed: Phase 1 + Phase 2A + Phase 2B
+## Current Status: Phases 1–4 Complete
+
+All four phases are committed and passing. Phase 5 (Calendar + Polish) is the only remaining phase.
+
+---
+
+## Completed Phases
 
 ### Phase 1: Foundation
-All foundation work is committed and passing.
-
-- Next.js 16 App Router scaffolded with TypeScript strict mode, Tailwind v4, shadcn/ui
-- Supabase integration: browser client (`lib/supabase/client.ts`) and server client (`lib/supabase/server.ts`)
-- Full DB schema applied in Supabase: `profiles`, `log_entries`, `habits`, `habit_logs`, `calendar_events`, `insights_cache` — all with RLS and the standard four-policy pattern
+- Next.js 16 App Router with TypeScript strict mode, Tailwind v4, shadcn/ui
+- Supabase integration: `lib/supabase/client.ts` (browser), `lib/supabase/server.ts` (server/cookie-based)
+- Full DB schema in Supabase: `profiles`, `log_entries`, `habits`, `habit_logs`, `calendar_events`, `insights_cache` — all with RLS and the standard four-policy pattern
 - Auth pages: `/login`, `/signup`
 - Auth guard in `proxy.ts` (Next.js 16 renamed `middleware.ts` → `proxy.ts`): redirects unauthenticated users from dashboard routes to `/login`
 - Sidebar layout with 4 nav links: Dashboard, Log, Habits, Calendar
@@ -24,10 +28,10 @@ Committed as: `Phase 2a: core logging, habits, real dashboard data`
 
 **Components:**
 - `components/logging/LogTypeFields.tsx` — conditional fields for all 5 entry types (meal, workout, bodyweight, mood, reflection)
-- `components/logging/LogEntryForm.tsx` — tabbed form, Sonner toast on save, accepts optional `prefill?: ParsedLogEntry` for future voice confirmation flow
+- `components/logging/LogEntryForm.tsx` — tabbed form, Sonner toast on save, accepts optional `prefill?: ParsedLogEntry`
 - `components/logging/RecentLogList.tsx` — entry list with type-colored badges, relative timestamps, optional delete
 - `components/habits/HabitCard.tsx` — optimistic checkbox toggle, streak display, delete
-- `components/habits/TodayHabitChecklist.tsx` — habit list + add form with 6 preset color swatches; `showAddForm` prop controls whether the add form renders (used to hide it on dashboard)
+- `components/habits/TodayHabitChecklist.tsx` — habit list + add form with 6 preset color swatches; `showAddForm` prop hides the add form on dashboard
 
 **Pages updated:**
 - `app/(dashboard)/log/page.tsx` — server-fetches last 10 entries, renders `LogEntryForm` + `RecentLogList`
@@ -38,66 +42,159 @@ Committed as: `Phase 2a: core logging, habits, real dashboard data`
 Committed as: `Phase 2b: stats, mock insights, and insight card`
 
 **Library modules:**
-- `lib/ai/computeStats.ts` — queries last 7 days of `log_entries`, `habit_logs`, `calendar_events`; returns `DashboardStats`. Called directly from the dashboard page and from the insights POST route.
-- `lib/ai/mockNarrativeGenerator.ts` — template-based 3–4 sentence paragraph from `DashboardStats`. Opening line uses real meal/workout counts. Mood, habit, weight sentences are conditionally appended. Suggestion rotates deterministically by day of year (`Math.floor(Date.now() / 86400000) % 5`).
-- `lib/ai/insightEngine.ts` — abstraction entry point; mock-only for now. LLM branch (`ANTHROPIC_API_KEY`) wired in Phase 4.
-- `lib/voice/mockTranscriptParser.ts` — keyword regex matching; returns `ParsedLogEntry`. Priority order: bodyweight > workout > meal > mood > reflection (default).
-- `lib/voice/transcriptParser.ts` — abstraction shell; mock-only for now. Phase 3 adds ElevenLabs STT + LLM branches.
+- `lib/ai/computeStats.ts` — queries last 7 days; returns `DashboardStats`. Called from dashboard page and insights POST route.
+- `lib/ai/mockNarrativeGenerator.ts` — template-based 3–4 sentence paragraph from `DashboardStats`. Suggestion rotates deterministically by day of year (`Math.floor(Date.now() / 86400000) % 5`).
+- `lib/ai/insightEngine.ts` — abstraction entry point. Mock-only until Phase 4. LLM branch wired in Phase 4.
+- `lib/voice/mockTranscriptParser.ts` — keyword regex matching; returns `ParsedLogEntry`. Priority: bodyweight > workout > meal > mood > reflection.
+- `lib/voice/transcriptParser.ts` — abstraction shell. Mock-only until Phase 3.
 
 **API routes:**
-- `app/api/voice/stt/route.ts` — **501 stub**. Returns `{ error: 'Voice input not yet configured' }`. Does auth check (returns 401 without session). Route shape exists for Playwright mock interception in Phase 3.
 - `app/api/insights/route.ts` — GET (cache check + stale flag), POST (generate → upsert `insights_cache`)
 
 **Components:**
-- `components/insights/DeterministicStats.tsx` — stat chips (meals, workouts + minutes, avg mood, active habits). Server-safe: receives `DashboardStats` as prop, no client state.
-- `components/insights/InsightCard.tsx` — client component. Renders `DeterministicStats` always. Shows "Generate Insight" button when no cached insight. On generate: POSTs to `/api/insights`, updates local state. Shows narrative + mode badge ("Smart Summary" or "AI Insight") after generation. Stale warning shown when `isStale` prop is true.
-- `components/voice/InsightPlayer.tsx` — client component. Returns `null` when `audioUrl` is null. Will render play/pause button once `audio_url` is populated (Phase 4). No changes needed in Phase 4.
+- `components/insights/DeterministicStats.tsx` — stat chips. Server-safe, receives `DashboardStats` as prop.
+- `components/insights/InsightCard.tsx` — client component. Renders stats always. Shows "Generate Insight" button, narrative + mode badge after generation, stale warning.
+- `components/voice/InsightPlayer.tsx` — client component. Returns `null` when `audioUrl` is null. Renders play/pause button with real URL (live as of Phase 4).
 
-**Dashboard page updated:** `app/(dashboard)/dashboard/page.tsx` — replaced placeholder insight card with `InsightCard`. Runs `computeDashboardStats` and queries `insights_cache` in the same `Promise.all` as the rest of the page data.
+### Phase 3: Voice Input
+Committed as: `Phase 3: voice logging with ElevenLabs STT and Claude extraction`
+
+**New library modules:**
+- `lib/voice/elevenLabsSTT.ts` — `transcribeAudio(audioBlob: Blob): Promise<string>`. POSTs to ElevenLabs `/v1/speech-to-text` with `model_id: 'scribe_v1'`. Throws on non-OK response.
+- `lib/voice/llmTranscriptParser.ts` — `llmParseTranscript(transcript): Promise<ParsedLogEntry>`. Uses `@anthropic-ai/sdk`, calls `claude-sonnet-4-6` with extraction system prompt. Validates output with `ParsedLogEntrySchema.safeParse()`. Falls back to reflection type on Zod failure.
+
+**Updated modules:**
+- `lib/voice/transcriptParser.ts` — now has LLM branch: if `ANTHROPIC_API_KEY` → try `llmParseTranscript` → catch silently → `mockParseTranscript`. Two fallback layers: API failure falls back to keyword matcher; invalid JSON from Claude falls back to reflection.
+- `app/api/voice/stt/route.ts` — replaced 501 stub: receives `multipart/form-data` with `audio` field (Blob), calls `transcribeAudio` → `parseTranscript`, returns `{ parsedEntry, transcript }`. Does NOT save to DB.
+
+**New components:**
+- `components/voice/VoiceRecorder.tsx` — 4-state machine (`idle | recording | processing | result`). Uses `MediaRecorder` with `audio/webm;codecs=opus` (fallback to `audio/webm`). Auto-stop at 60s. Confirmation card shows editable `LogTypeFields`, notes, collapsible transcript, Save/Discard. Save failure keeps card visible. `onClose` prop for modal integration.
+
+**Updated components:**
+- `components/layout/TopNav.tsx` — added Mic icon button in header, fixed modal overlay with `VoiceRecorder` when open. Click-outside (checks `e.target === e.currentTarget`) closes modal.
+
+**Updated pages:**
+- `app/(dashboard)/log/page.tsx` — added voice tip callout above the form.
+
+### Phase 4: LLM + TTS Upgrade
+Committed as: `Phase 4: LLM narrative generation and ElevenLabs TTS for insight audio`
+
+**New library modules:**
+- `lib/ai/buildInsightPrompt.ts` — `buildInsightPrompt(stats, recentEntries): { system, user }`. System prompt: wellness coach, 2-3 paragraphs, actionable suggestion, under 250 words, second person. User message: stats block + recent moods + recent workouts + upcoming calendar events.
+- `lib/ai/llmNarrativeGenerator.ts` — `llmGenerateNarrative(stats, recentEntries): Promise<string>`. Calls `claude-sonnet-4-6`, `max_tokens: 500`. Throws if no text block in response.
+- `lib/voice/elevenLabsTTS.ts` — `synthesizeWithElevenLabs(text): Promise<Buffer>`. POSTs to ElevenLabs `/v1/text-to-speech/{VOICE_ID}` with `eleven_turbo_v2` model. Returns audio buffer.
+
+**Updated modules:**
+- `lib/ai/insightEngine.ts` — LLM branch added: if `ANTHROPIC_API_KEY` → try `llmGenerateNarrative` → catch silently → `mockGenerateNarrative`.
+- `app/api/insights/route.ts` POST pipeline now:
+  1. `computeDashboardStats` + fetch recentEntries
+  2. `generateNarrative(stats, recentEntries)` → narrative (auto: mock or LLM)
+  3. `synthesizeWithElevenLabs(narrative)` → audioBuffer
+  4. Upload buffer to Supabase Storage `insight-audio/{userId}/{Date.now()}.mp3`
+  5. Get public URL via `supabase.storage.getPublicUrl()`
+  6. Upsert `insights_cache` with `audio_url` populated
 
 ---
 
-## Auth / Session Note: `getSession()` vs `getUser()`
+## Current Features
+
+### Text Logging
+- 5 entry types: meal, workout, bodyweight, mood, reflection
+- Tabbed form at `/log` with type-specific fields
+- Recent entries list with delete
+- All entries visible on dashboard
+
+### Voice Logging
+- Mic button in top nav bar, accessible from any dashboard page
+- Records audio via browser `MediaRecorder` API
+- Sends to ElevenLabs STT → returns transcript
+- Transcript parsed by Claude (if `ANTHROPIC_API_KEY` set) or keyword matcher
+- Confirmation card shows parsed result with editable fields before saving
+- Saved with `voice_transcript` field populated
+
+### Habit Tracking
+- Create habits with name + color
+- Daily check-in with optimistic toggle
+- Streak computation (consecutive days from today backwards)
+- Compact view on dashboard, full CRUD at `/habits`
+
+### AI Insights
+- Stat chips always visible (meals, workouts, avg mood, active habits)
+- "Generate Insight" button triggers narrative + TTS pipeline
+- Narrative stored in `insights_cache`, audio stored in Supabase Storage
+- Play button appears after generation
+- 24-hour cache with stale detection
+
+### Calendar
+- Page exists at `/calendar` but is a placeholder (Phase 5 implements ICS import)
+
+---
+
+## Dual-Mode AI System
+
+### Mode detection
+Both switches are server-side only. The browser never knows which mode is active.
+
+| Feature | Mode condition | Implementation |
+|---|---|---|
+| Transcript parsing | `ANTHROPIC_API_KEY` set | `lib/voice/transcriptParser.ts` → calls `llmParseTranscript` or `mockParseTranscript` |
+| Insight narrative | `ANTHROPIC_API_KEY` set | `lib/ai/insightEngine.ts` → calls `llmGenerateNarrative` or `mockGenerateNarrative` |
+| TTS audio | Always (ElevenLabs required) | `lib/voice/elevenLabsTTS.ts` — no mock fallback |
+
+### Mock mode (no `ANTHROPIC_API_KEY`)
+- Narrative: template sentences filled from real `DashboardStats`. Deterministic — same data produces same output.
+- Transcript parsing: keyword regex matching. Priority: bodyweight > workout > meal > mood > reflection.
+- UI badge: "Smart Summary"
+
+### LLM mode (`ANTHROPIC_API_KEY` present)
+- Narrative: `claude-sonnet-4-6`, max 500 tokens, wellness coach system prompt.
+- Transcript parsing: `claude-sonnet-4-6`, max 512 tokens, structured extraction prompt. Falls back to mock if Claude call fails or returns invalid JSON.
+- UI badge: "AI Insight"
+
+### Fallback chain for transcript parsing
+```
+User speaks
+  → ElevenLabs STT (always, no fallback — throws if fails)
+  → if ANTHROPIC_API_KEY:
+      → try llmParseTranscript
+          → if JSON invalid: return reflection type (never throws)
+      → on network/API error: fall through to mock
+  → mockParseTranscript (always returns valid ParsedLogEntry)
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key (safe to expose to browser) |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | Not used in MVP (reserved) |
+| `ELEVENLABS_API_KEY` | Yes | ElevenLabs STT + TTS — voice will not work without this |
+| `ELEVENLABS_VOICE_ID` | Yes | TTS voice ID — required alongside `ELEVENLABS_API_KEY` |
+| `ANTHROPIC_API_KEY` | No | If absent: mock narrative + keyword parser. If present: Claude-backed narrative + extraction. |
+
+**Current `.env.local` status:**
+- Supabase URL + keys: configured
+- ElevenLabs API key + voice ID: configured
+- Anthropic API key: empty (mock mode active)
+
+---
+
+## Auth / Session Pattern
 
 All API route handlers use `supabase.auth.getSession()` instead of `supabase.auth.getUser()`.
 
-**Why this matters:**
-- `getUser()` makes a live network request to Supabase's auth server to validate the JWT on every call. In the E2E test environment (and potentially under load), this can return `null` even when valid session cookies are present, causing spurious 401s.
-- `getSession()` reads and validates the JWT locally from the cookie — no network roundtrip. It is faster and reliable in test environments.
-- **Security is not weakened:** Supabase RLS enforces ownership at the database level for all queries. An attacker with a forged JWT cannot access other users' data.
+**Why:** `getUser()` makes a live network request to Supabase's auth server on every call. In the E2E test environment this causes spurious 401s even with valid cookies. `getSession()` validates the JWT locally from the cookie — faster and reliable.
+
+**Security:** Supabase RLS enforces ownership at the DB level for all queries regardless.
 
 Apply this pattern to all future route handlers.
 
 ---
 
-## Insight Cache Behavior
-
-**Cache key:** `(user_id, period_end)` where `period_end = today's date (YYYY-MM-DD)`. Unique constraint on the table enforces one row per user per day.
-
-**Cache hit condition (GET):** Row exists where `user_id = auth.uid()` AND `period_end = today` AND `created_at > now() - 24 hours`.
-
-**On generate (POST):** Upserts with `ON CONFLICT (user_id, period_end) DO UPDATE`. Regenerating on the same day overwrites the existing row rather than creating a duplicate.
-
-**Stale detection:** After a cache hit, checks if any `log_entries.created_at > insights_cache.created_at`. If yes, `isStale: true` is returned. The UI shows a yellow warning: "New data available — regenerate for an updated insight." Clicking "Regenerate" calls POST again, overwrites the cache, and clears the stale flag.
-
-**`audio_url` is always null until Phase 4.** The `InsightPlayer` component renders nothing when `audio_url` is null.
-
-**`insight_mode` column** is already in the `insights_cache` schema (`text NOT NULL DEFAULT 'mock'`). Set to `'mock'` in Phase 2B, will be set to `'llm'` in Phase 4 when `ANTHROPIC_API_KEY` is present.
-
----
-
-## Voice STT Status
-
-`app/api/voice/stt/route.ts` is a **501 stub**. It:
-- Returns 401 if no session (auth check is real)
-- Returns `501 Not Implemented` with `{ error: 'Voice input not yet configured' }` for all authenticated requests
-- `VoiceRecorder.tsx` does not exist yet — built in Phase 3
-
-Phase 3 will replace this stub with a real implementation that calls `lib/voice/elevenLabsSTT.ts` → ElevenLabs STT → `lib/voice/transcriptParser.ts`.
-
----
-
-## Tests Currently Passing
+## Test Coverage
 
 All 5 Playwright E2E tests pass (`npm run test:e2e`):
 
@@ -109,42 +206,68 @@ All 5 Playwright E2E tests pass (`npm run test:e2e`):
 | User can create a meal log entry | `tests/logging.spec.ts` |
 | Saved log entry appears in recent logs on dashboard | `tests/dashboard.spec.ts` |
 
+**Mock strategy:** `/api/voice/stt` and `/api/insights` POST are intercepted via `page.route()` in `tests/helpers/mocks.ts`. No real ElevenLabs or Anthropic calls in tests.
+
+**Test user:** `test@aidashboard.dev` / `TestPassword123!` — exists in Supabase Auth, never deleted by tests.
+
 ---
 
-## Next Recommended Step: Phase 3 — Voice Input
+## Supabase Setup Status
 
-Phase 3 wires in real voice logging. Requires `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in `.env.local`.
+All tables exist with RLS enabled. The `insight_mode` column in `insights_cache` must be added manually if not already present:
 
-**What to build:**
-1. `lib/voice/elevenLabsSTT.ts` — `transcribeAudio(audioBlob: Blob): Promise<string>` using ElevenLabs `/v1/speech-to-text` with `model_id: 'scribe_v1'`
-2. `lib/voice/llmTranscriptParser.ts` — Claude-backed extraction (used when `ANTHROPIC_API_KEY` is set). Falls back to mock on failure.
-3. Update `lib/voice/transcriptParser.ts` — add LLM branch: if `ANTHROPIC_API_KEY` → `llmTranscriptParser`, else mock
-4. Update `app/api/voice/stt/route.ts` — replace 501 stub: receive `multipart/form-data` audio, call `transcribeAudio` → `parseTranscript`, return `{ parsedEntry, transcript }`
-5. `components/voice/VoiceRecorder.tsx` — four states: `idle | recording | processing | result`. Uses `MediaRecorder` with `audio/webm;codecs=opus`. Confirmation card shows editable fields before save.
-6. Update `components/layout/TopNav.tsx` — render `VoiceRecorder` in top-right, confirmation card as modal overlay
+```sql
+ALTER TABLE public.insights_cache ADD COLUMN IF NOT EXISTS insight_mode text NOT NULL DEFAULT 'mock';
+```
 
-**Acceptance criteria for Phase 3:**
-- "I had a chicken salad for lunch, about 450 calories" → type=meal, calories=450
-- "Did a 30 minute moderate run" → type=workout, duration_min=30, intensity=moderate
-- Ambiguous input → type=reflection with full transcript as content
-- Entry saved with `voice_transcript` populated
-- Confirmation card allows editing fields before save
-- Microphone permission denied → inline error, stay idle
-- `ELEVENLABS_API_KEY` never sent to browser
-- All 5 existing E2E tests still pass
+Supabase Storage bucket `insight-audio` (public) must exist for TTS audio upload to work.
 
 ---
 
 ## Known Caveats and Technical Debt
 
-**Streak computation is duplicated.** The `computeStreak` / `countThisWeek` helpers in `app/(dashboard)/habits/page.tsx` and `app/(dashboard)/dashboard/page.tsx` are copy-pasted. The canonical implementation is now in `lib/ai/computeStats.ts` (used for the insight card). The habits checklist still uses the local copies because it needs `completedToday` per habit, which `computeStats` doesn't compute. Acceptable for MVP — extract a shared helper if this diverges further.
+**Streak computation is duplicated.** `app/(dashboard)/habits/page.tsx` and `app/(dashboard)/dashboard/page.tsx` both compute streaks locally. The canonical implementation is in `lib/ai/computeStats.ts`. Acceptable for MVP.
 
-**`RecentLogList` re-exports `Badge` unnecessarily.** The Badge import was added to silence a potential tree-shaking issue but is not used in the component's JSX. Remove the re-export line in a cleanup pass.
+**No error boundary on dashboard.** If any parallel fetch in the dashboard page fails, Next.js shows an error page. Phase 5 addresses this with empty/error states.
 
-**No error boundary on dashboard.** If any of the parallel `Promise.all` fetches fail (including `computeDashboardStats`), the dashboard page throws and shows a Next.js error page. Phase 5 adds proper empty/error states — acceptable for now.
+**Test user data accumulates.** E2E tests write real `log_entries` and never clean up. Acceptable for 5 tests but will become noise if assertion counts matter.
 
-**`insights_cache` has `insight_mode` column pre-added.** The migration in `supabase/migrations/001_initial_schema.sql` already includes `insight_mode text NOT NULL DEFAULT 'mock'`. This avoids the ALTER TABLE migration planned in Phase 4.
+**`computeDashboardStats` is called twice on dashboard load.** Once for the `InsightCard`, once inside the insights POST route. Intentional — they run at different times and data may differ.
 
-**Test user data accumulates.** The E2E tests write real `log_entries` to the test user's account in Supabase and never clean them up. Acceptable for current 5 tests but will become noise in later tests that assert specific counts. Add a `beforeEach` cleanup step in Phase 3 tests if needed.
+**No ANTHROPIC_API_KEY configured.** App runs in mock mode. To enable LLM narratives and Claude-backed transcript extraction, add the key to `.env.local` and redeploy.
 
-**`computeDashboardStats` is called twice on dashboard load.** The dashboard page calls it directly for the `InsightCard`, but the insights POST route also calls it when generating. This is intentional — they run at different times (page load vs. button click) and the data may differ. Not a bug.
+---
+
+## Next Step: Phase 5 — Calendar + Polish
+
+Phase 5 is the final phase. It adds ICS calendar import, a demo data seed endpoint, loading skeletons, empty states, and final polish.
+
+### Phase 5 Execution Prompt
+
+```
+Read docs/session-summary.md and CLAUDE.md. Then implement Phase 5 (Calendar + Polish) end-to-end.
+
+Before starting, confirm:
+- The `ical.js` package is available (install if not: npm install ical.js)
+- The calendar page at app/(dashboard)/calendar/page.tsx is currently a placeholder
+
+Phase 5 tasks:
+1. Install ical.js: npm install ical.js
+2. Create lib/calendar/parseICS.ts — parseICS(icsString): CalendarEvent[]. Skip RRULEs, only future events within 90 days, return [] on parse error.
+3. Create app/api/calendar/route.ts — GET (upcoming events, ordered ASC, limit 20), POST (ICS import via multipart/form-data, upsert on ics_uid, return { imported, skipped })
+4. Create components/calendar/ICSUploader.tsx — file input (.ics only) + Import button, shows result count or error
+5. Update app/(dashboard)/calendar/page.tsx — render ICSUploader + sorted event list, empty state
+6. Create app/api/seed/route.ts — POST: deletes last 8 days of log_entries for auth user, inserts 7 days of realistic seed data (14 meals, 3 workouts, 4 moods, 2 reflections, 2 bodyweight entries). Return { seeded: number }.
+7. Update app/(dashboard)/dashboard/page.tsx — add "Seed Demo Data" button (visible when NEXT_PUBLIC_DEMO_MODE=true or NODE_ENV=development)
+8. Add loading skeletons using shadcn Skeleton to: RecentLogList, InsightCard, TodayHabitChecklist
+9. Add empty states: RecentLogList ("No entries yet. Log your first entry above."), TodayHabitChecklist ("No habits yet. Add your first habit below.")
+10. Wrap all API route handlers in try/catch with { error: string } responses (audit any missing)
+11. Run npm run lint && npm run typecheck && npm run test:e2e — all must pass
+12. Commit as: "Phase 5: calendar import, seed data, skeletons, and empty states"
+
+Constraints:
+- Do NOT implement OAuth, recurring event support, manual calendar event creation, or drag-and-drop
+- Do NOT add pagination to any list
+- Seed data must be hardcoded realistic values — not random
+- Do not touch any Phase 1–4 files unless fixing a bug surfaced by Phase 5
+```
