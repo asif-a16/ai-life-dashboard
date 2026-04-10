@@ -1,11 +1,17 @@
 import { mockGenerateNarrative } from './mockNarrativeGenerator'
+import { llmGenerateNarrative } from './llmNarrativeGenerator'
 import type { DashboardStats, RecentEntriesContext } from '@/lib/types'
 
 export async function generateNarrative(
   stats: DashboardStats,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _recentEntries: RecentEntriesContext
+  recentEntries: RecentEntriesContext
 ): Promise<string> {
-  // LLM branch added in Phase 4
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      return await llmGenerateNarrative(stats, recentEntries)
+    } catch {
+      // LLM failed — fall back to mock narrative
+    }
+  }
   return mockGenerateNarrative(stats)
 }

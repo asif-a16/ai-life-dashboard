@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeDashboardStats } from '@/lib/ai/computeStats'
 import { generateNarrative } from '@/lib/ai/insightEngine'
+import { synthesizeWithElevenLabs } from '@/lib/voice/elevenLabsTTS'
 import type { RecentEntriesContext } from '@/lib/types'
 
 export async function GET() {
@@ -85,6 +86,18 @@ export async function POST() {
     const narrative = await generateNarrative(stats, recentEntries)
     const insightMode = process.env.ANTHROPIC_API_KEY ? 'llm' : 'mock'
 
+    const audioBuffer = await synthesizeWithElevenLabs(narrative)
+    const storagePath = `${userId}/${Date.now()}.mp3`
+    const { error: uploadError } = await supabase.storage
+      .from('insight-audio')
+      .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+
+    if (uploadError) throw new Error(`Audio upload failed: ${uploadError.message}`)
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('insight-audio')
+      .getPublicUrl(storagePath)
+
     const { data: upserted, error } = await supabase
       .from('insights_cache')
       .upsert(
@@ -93,7 +106,7 @@ export async function POST() {
           period_end: today,
           stats_json: stats,
           narrative,
-          audio_url: null,
+          audio_url: publicUrl,
           insight_mode: insightMode,
         },
         { onConflict: 'user_id,period_end' }
