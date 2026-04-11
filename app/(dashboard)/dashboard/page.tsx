@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TodayHabitChecklist } from '@/components/habits/TodayHabitChecklist'
 import { RecentLogList } from '@/components/logging/RecentLogList'
 import { InsightCard } from '@/components/insights/InsightCard'
+import { SeedButton } from '@/components/dashboard/SeedButton'
 import { computeDashboardStats } from '@/lib/ai/computeStats'
 import type { Habit, HabitLog, HabitWithLog, InsightCache, LogEntryRow } from '@/lib/types'
 
@@ -120,9 +121,14 @@ export default async function DashboardPage() {
     <>
       <TopNav title="Dashboard" />
       <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">Welcome back, {displayName}</h2>
-          <p className="text-muted-foreground mt-1">Here&apos;s your health overview</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">Welcome back, {displayName}</h2>
+            <p className="text-muted-foreground mt-1">Here&apos;s your health overview</p>
+          </div>
+          {(process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || process.env.NODE_ENV === 'development') && (
+            <SeedButton />
+          )}
         </div>
 
         <Card>

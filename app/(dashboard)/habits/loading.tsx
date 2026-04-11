@@ -1,0 +1,23 @@
+import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { TopNav } from '@/components/layout/TopNav'
+
+export default function HabitsLoading() {
+  return (
+    <>
+      <TopNav title="Habits" />
+      <div className="p-6 max-w-2xl mx-auto space-y-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <Skeleton className="h-4 w-28" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  )
+}
