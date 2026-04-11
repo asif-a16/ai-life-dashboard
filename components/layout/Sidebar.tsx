@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, ClipboardList, CheckSquare, Calendar, Menu, X } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, CheckSquare, Calendar, History, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/log', label: 'Log', icon: ClipboardList },
+  { href: '/history', label: 'History', icon: History },
   { href: '/habits', label: 'Habits', icon: CheckSquare },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
 ]

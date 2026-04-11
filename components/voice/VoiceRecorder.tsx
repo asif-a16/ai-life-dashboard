@@ -32,7 +32,7 @@ const TYPE_LABELS: Record<LogEntryType, string> = {
 }
 
 interface VoiceRecorderProps {
-  onClose?: () => void
+  onDone?: () => void
 }
 
 // ─── Auto-play hook ───────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ function QuestionResultCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function VoiceRecorder({ onClose }: VoiceRecorderProps) {
+export function VoiceRecorder({ onDone }: VoiceRecorderProps) {
   const router = useRouter()
   const [recorderState, setRecorderState] = useState<RecorderState>({ status: 'idle' })
   const [error, setError] = useState<string | null>(null)
@@ -235,7 +235,7 @@ export function VoiceRecorder({ onClose }: VoiceRecorderProps) {
       toast('Entry saved')
       router.refresh()
       handleReset()
-      onClose?.()
+      onDone?.()
     } catch {
       setError('Failed to save entry. Please try again.')
     } finally {
@@ -293,7 +293,7 @@ export function VoiceRecorder({ onClose }: VoiceRecorderProps) {
     return (
       <QuestionResultCard
         answer={recorderState.answer}
-        onDone={() => { handleReset(); onClose?.() }}
+        onDone={() => { handleReset(); onDone?.() }}
       />
     )
   }

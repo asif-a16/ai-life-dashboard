@@ -7,8 +7,21 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { LogTypeFields } from './LogTypeFields'
 import type { LogEntryType, ParsedLogEntry } from '@/lib/types'
+
+function toDatetimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function tomorrowMax(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(23, 59, 0, 0)
+  return toDatetimeLocal(d)
+}
 
 const DEFAULT_DATA: Record<LogEntryType, Record<string, unknown>> = {
   meal: { description: '', meal_type: 'lunch', calories: null, protein_g: null },
@@ -34,6 +47,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
   })
   const [notes, setNotes] = useState(prefill?.notes ?? '')
   const [showNotes, setShowNotes] = useState(false)
+  const [loggedAt, setLoggedAt] = useState(() => toDatetimeLocal(new Date()))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,6 +68,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
           type: selectedType,
           data: formData[selectedType],
           notes: notes || undefined,
+          logged_at: new Date(loggedAt).toISOString(),
         }),
       })
 
@@ -73,6 +88,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
       })
       setNotes('')
       setShowNotes(false)
+      setLoggedAt(toDatetimeLocal(new Date()))
       router.refresh()
     } catch {
       setError('Failed to save entry. Please try again.')
@@ -83,6 +99,17 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-1.5">
+        <Label htmlFor="logged-at">When</Label>
+        <Input
+          id="logged-at"
+          type="datetime-local"
+          value={loggedAt}
+          max={tomorrowMax()}
+          onChange={(e) => setLoggedAt(e.target.value)}
+        />
+      </div>
+
       <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as LogEntryType)}>
         <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="meal">Meal</TabsTrigger>

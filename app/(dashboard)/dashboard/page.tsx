@@ -1,12 +1,7 @@
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { TopNav } from '@/components/layout/TopNav'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TodayHabitChecklist } from '@/components/habits/TodayHabitChecklist'
-import { RecentLogList } from '@/components/logging/RecentLogList'
-import { InsightCard } from '@/components/insights/InsightCard'
 import { SeedButton } from '@/components/dashboard/SeedButton'
-import { BodyweightChart } from '@/components/charts/BodyweightChart'
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { computeDashboardStats } from '@/lib/ai/computeStats'
 import type { Habit, HabitLog, HabitWithLog, InsightCache, LogEntryRow } from '@/lib/types'
 
@@ -19,20 +14,18 @@ function computeStreak(habitId: string, logs: HabitLog[]): number {
 
   if (habitLogs.length === 0) return 0
 
-  const streak = { count: 0 }
+  let count = 0
   const cursor = new Date()
-
   for (const dateStr of habitLogs) {
     const cursorStr = cursor.toISOString().split('T')[0]
     if (dateStr === cursorStr) {
-      streak.count++
+      count++
       cursor.setDate(cursor.getDate() - 1)
     } else {
       break
     }
   }
-
-  return streak.count
+  return count
 }
 
 function countThisWeek(habitId: string, logs: HabitLog[]): number {
@@ -61,6 +54,7 @@ export default async function DashboardPage() {
     stats,
     { data: cachedInsight },
     { data: bwEntries },
+    { data: mealEntries },
   ] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user!.id).single(),
     supabase
@@ -100,9 +94,14 @@ export default async function DashboardPage() {
       .eq('user_id', user!.id)
       .eq('type', 'bodyweight')
       .order('logged_at', { ascending: true }),
+    supabase
+      .from('log_entries')
+      .select('data, logged_at')
+      .eq('user_id', user!.id)
+      .eq('type', 'meal')
+      .order('logged_at', { ascending: false }),
   ])
 
-  // Check if insight is stale (new entries added after last generation)
   let isStale = false
   if (cachedInsight) {
     const { data: newerEntries } = await supabase
@@ -125,66 +124,25 @@ export default async function DashboardPage() {
     completedThisWeek: countThisWeek(h.id, allLogs),
   }))
 
+  const showSeedButton =
+    process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || process.env.NODE_ENV === 'development'
+      ? <SeedButton />
+      : undefined
+
   return (
     <>
       <TopNav title="Dashboard" />
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold">Welcome back, {displayName}</h2>
-            <p className="text-muted-foreground mt-1">Here&apos;s your health overview</p>
-          </div>
-          {(process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || process.env.NODE_ENV === 'development') && (
-            <SeedButton />
-          )}
-        </div>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Today&apos;s Habits</CardTitle>
-            <Link href="/habits" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              Manage habits →
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <TodayHabitChecklist habits={habitsWithLog} showAddForm={false} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Recent Entries</CardTitle>
-            <Link href="/log" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              View all →
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <RecentLogList entries={(entries ?? []) as LogEntryRow[]} showDelete={false} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Weekly Insight</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <InsightCard
-              stats={stats}
-              initialInsight={cachedInsight as InsightCache | null}
-              isStale={isStale}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Body Weight</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BodyweightChart entries={bwEntries ?? []} />
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout
+        displayName={displayName}
+        habitsWithLog={habitsWithLog}
+        entries={(entries ?? []) as LogEntryRow[]}
+        stats={stats}
+        cachedInsight={cachedInsight as InsightCache | null}
+        isStale={isStale}
+        bwEntries={bwEntries ?? []}
+        mealEntries={mealEntries ?? []}
+        showSeedButton={showSeedButton}
+      />
     </>
   )
 }

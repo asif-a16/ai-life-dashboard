@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { LogTypeFields } from '@/components/logging/LogTypeFields'
 import type { LogEntryRow, LogEntryType } from '@/lib/types'
+import { useLogDetailPrefs } from '@/hooks/useLogDetailPrefs'
+import type { DetailLevel } from '@/hooks/useLogDetailPrefs'
 
 const TYPE_COLORS: Record<LogEntryType, string> = {
   meal: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
@@ -18,13 +20,34 @@ const TYPE_COLORS: Record<LogEntryType, string> = {
   reflection: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
 }
 
-function summarize(entry: LogEntryRow): string {
+function summarize(entry: LogEntryRow, level: DetailLevel): string {
   const d = entry.data
+  if (level === 'compact') {
+    switch (entry.type) {
+      case 'meal': return d.description as string
+      case 'workout': return d.activity as string
+      case 'bodyweight': return `${d.weight_kg} ${d.unit}`
+      case 'mood': return `Mood ${d.score}/10`
+      case 'reflection': {
+        const content = d.content as string
+        return content.length > 50 ? content.slice(0, 50) + '...' : content
+      }
+      default: return ''
+    }
+  }
   switch (entry.type) {
     case 'meal': {
       const desc = d.description as string
       const cal = d.calories as number | null
-      return cal ? `${desc} — ${cal} cal` : desc
+      const parts = [cal ? `${cal} cal` : null]
+      const protein = d.protein_g as number | null
+      if (protein) parts.push(`${protein}g protein`)
+      const fat = d.fat_g as number | null
+      if (fat) parts.push(`${fat}g fat`)
+      const carbs = d.carbs_g as number | null
+      if (carbs) parts.push(`${carbs}g carbs`)
+      const extra = parts.filter(Boolean).join(' · ')
+      return extra ? `${desc} — ${extra}` : desc
     }
     case 'workout': {
       const act = d.activity as string
@@ -38,7 +61,8 @@ function summarize(entry: LogEntryRow): string {
     }
     case 'mood': {
       const score = d.score as number
-      return `Mood ${score}/10`
+      const energy = d.energy_level as number
+      return `Mood ${score}/10 · Energy ${energy}/10`
     }
     case 'reflection': {
       const content = d.content as string
@@ -67,6 +91,7 @@ interface RecentLogListProps {
 
 export function RecentLogList({ entries, showDelete }: RecentLogListProps) {
   const router = useRouter()
+  const [detailPrefs] = useLogDetailPrefs()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, unknown>>({})
@@ -188,7 +213,7 @@ export function RecentLogList({ entries, showDelete }: RecentLogListProps) {
                 {entry.type}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">{summarize(entry)}</p>
+                <p className="text-sm truncate">{summarize(entry, detailPrefs[entry.type])}</p>
                 <p className="text-xs text-muted-foreground">{relativeTime(entry.logged_at)}</p>
               </div>
               {showDelete && (
