@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { computeDashboardStats } from '@/lib/ai/computeStats'
 import { generateNarrative } from '@/lib/ai/insightEngine'
 import { synthesizeWithElevenLabs } from '@/lib/voice/elevenLabsTTS'
@@ -86,17 +87,27 @@ export async function POST() {
     const narrative = await generateNarrative(stats, recentEntries)
     const insightMode = process.env.ANTHROPIC_API_KEY ? 'llm' : 'mock'
 
-    const audioBuffer = await synthesizeWithElevenLabs(narrative)
-    const storagePath = `${userId}/${Date.now()}.mp3`
-    const { error: uploadError } = await supabase.storage
-      .from('insight-audio')
-      .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+    // TTS + storage upload are best-effort — a failure here must not fail the insight
+    let audioUrl: string | null = null
+    try {
+      const audioBuffer = await synthesizeWithElevenLabs(narrative)
+      const storagePath = `${userId}/${Date.now()}.mp3`
+      const serviceClient = createServiceClient()
+      const { error: uploadError } = await serviceClient.storage
+        .from('insight-audio')
+        .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
 
-    if (uploadError) throw new Error(`Audio upload failed: ${uploadError.message}`)
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('insight-audio')
-      .getPublicUrl(storagePath)
+      if (uploadError) {
+        console.error('[insights] Audio upload failed:', uploadError.message)
+      } else {
+        const { data: { publicUrl } } = serviceClient.storage
+          .from('insight-audio')
+          .getPublicUrl(storagePath)
+        audioUrl = publicUrl
+      }
+    } catch (audioErr) {
+      console.error('[insights] TTS/audio error (non-fatal):', audioErr instanceof Error ? audioErr.message : audioErr)
+    }
 
     const { data: upserted, error } = await supabase
       .from('insights_cache')
@@ -106,7 +117,7 @@ export async function POST() {
           period_end: today,
           stats_json: stats,
           narrative,
-          audio_url: publicUrl,
+          audio_url: audioUrl,
           insight_mode: insightMode,
         },
         { onConflict: 'user_id,period_end' }
