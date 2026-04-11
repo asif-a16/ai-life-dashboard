@@ -15,6 +15,13 @@ export function PSTUploader() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const MAX_BYTES = 50 * 1024 * 1024 // 50 MB
+    if (file.size > MAX_BYTES) {
+      setError('PST file is too large (max 50 MB). Export only your Calendar folder as a smaller .pst, or use File → Export to ICS instead.')
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
