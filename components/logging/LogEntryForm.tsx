@@ -111,7 +111,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
       </div>
 
       <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as LogEntryType)}>
-        <TabsList className="grid grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-3 sm:grid-cols-5 w-full">
           <TabsTrigger value="meal">Meal</TabsTrigger>
           <TabsTrigger value="workout">Workout</TabsTrigger>
           <TabsTrigger value="bodyweight">Weight</TabsTrigger>
@@ -135,7 +135,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
           <button
             type="button"
             onClick={() => setShowNotes(true)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-primary/80 hover:text-primary underline-offset-2 hover:underline transition-colors"
           >
             + Add notes
           </button>
@@ -155,7 +155,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={isSubmitting} className="w-full">
+      <Button type="submit" disabled={isSubmitting} className="w-full h-11">
         {isSubmitting ? 'Saving...' : 'Save Entry'}
       </Button>
     </form>

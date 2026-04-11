@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, CalendarDays } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
@@ -15,12 +15,12 @@ const TYPE_LABELS: Record<LogEntryType, string> = {
   reflection: 'Reflections',
 }
 
-const TYPE_BORDER: Record<LogEntryType, string> = {
-  meal: 'border-l-blue-400',
-  workout: 'border-l-green-400',
-  bodyweight: 'border-l-orange-400',
-  mood: 'border-l-purple-400',
-  reflection: 'border-l-slate-400',
+const LOG_TYPE_VAR: Record<LogEntryType, string> = {
+  meal: 'var(--log-meal)',
+  workout: 'var(--log-workout)',
+  bodyweight: 'var(--log-bodyweight)',
+  mood: 'var(--log-mood)',
+  reflection: 'var(--log-reflection)',
 }
 
 const ENTRY_TYPES: LogEntryType[] = ['meal', 'workout', 'bodyweight', 'mood', 'reflection']
@@ -54,21 +54,22 @@ function formatTime(isoString: string): string {
 
 function CollapsibleGroup({ type, entries }: { type: LogEntryType; entries: LogEntryRow[] }) {
   const [open, setOpen] = useState(true)
+  const typeVar = LOG_TYPE_VAR[type]
 
   return (
-    <div className={`border-l-4 ${TYPE_BORDER[type]} pl-3 space-y-1`}>
+    <div className="border-l-2 pl-3 space-y-1" style={{ borderLeftColor: typeVar }}>
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 w-full text-left py-1"
       >
         <span className="text-sm font-medium flex-1">{TYPE_LABELS[type]}</span>
         <Badge variant="secondary" className="text-xs">{entries.length}</Badge>
-        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-150 ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && (
         <ul className="space-y-1 pb-1">
           {entries.map((entry) => (
-            <li key={entry.id} className="flex items-center justify-between gap-2">
+            <li key={entry.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/50">
               <p className="text-sm text-muted-foreground">{summarize(entry)}</p>
               <span className="text-xs text-muted-foreground shrink-0">{formatTime(entry.logged_at)}</span>
             </li>
@@ -85,7 +86,6 @@ interface DayLogViewProps {
 }
 
 export function DayLogView({ selectedDate, userId }: DayLogViewProps) {
-  // Track loaded data as { date, entries } so we can derive loading state
   const [loaded, setLoaded] = useState<{ date: string; entries: LogEntryRow[] } | null>(null)
 
   const isLoading = loaded?.date !== selectedDate
@@ -120,13 +120,21 @@ export function DayLogView({ selectedDate, userId }: DayLogViewProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{displayDate}</CardTitle>
+        <CardTitle className="text-sm font-semibold">{displayDate}</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 rounded-xl bg-muted animate-pulse" />
+            ))}
+          </div>
         ) : entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No entries for this day.</p>
+          <div className="flex flex-col items-center py-10 text-center gap-2">
+            <CalendarDays className="h-9 w-9 text-muted-foreground/30" />
+            <p className="text-sm font-medium text-muted-foreground">No entries for this day</p>
+            <p className="text-xs text-muted-foreground/60">Log entries will appear here</p>
+          </div>
         ) : (
           <div className="space-y-4">
             {ENTRY_TYPES.filter((t) => grouped[t].length > 0).map((t) => (

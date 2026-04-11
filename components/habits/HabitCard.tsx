@@ -52,7 +52,7 @@ export function HabitCard({ habit }: HabitCardProps) {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+    <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${checked ? 'bg-muted/40' : ''}`}>
       <button
         type="button"
         role="checkbox"

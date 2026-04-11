@@ -2,15 +2,20 @@
 
 import { useState } from 'react'
 
+export type WidgetKey = 'habits' | 'recentLogs' | 'insight' | 'weightChart' | 'macroChart'
+
 export interface DashboardPrefs {
   showHabits: boolean
   showRecentLogs: boolean
   showInsight: boolean
   showWeightChart: boolean
   showMacroChart: boolean
+  widgetOrder: WidgetKey[]
 }
 
 const STORAGE_KEY = 'dashboard-prefs'
+
+const DEFAULT_ORDER: WidgetKey[] = ['habits', 'recentLogs', 'insight', 'weightChart', 'macroChart']
 
 const DEFAULTS: DashboardPrefs = {
   showHabits: true,
@@ -18,13 +23,20 @@ const DEFAULTS: DashboardPrefs = {
   showInsight: true,
   showWeightChart: true,
   showMacroChart: true,
+  widgetOrder: DEFAULT_ORDER,
 }
 
 function readPrefs(): DashboardPrefs {
   if (typeof window === 'undefined') return DEFAULTS
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    return stored ? { ...DEFAULTS, ...JSON.parse(stored) } : DEFAULTS
+    if (!stored) return DEFAULTS
+    const parsed = JSON.parse(stored)
+    return {
+      ...DEFAULTS,
+      ...parsed,
+      widgetOrder: Array.isArray(parsed.widgetOrder) ? parsed.widgetOrder : DEFAULT_ORDER,
+    }
   } catch {
     return DEFAULTS
   }

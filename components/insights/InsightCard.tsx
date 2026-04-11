@@ -40,13 +40,13 @@ export function InsightCard({ stats, initialInsight, isStale: initialIsStale }: 
       <DeterministicStats stats={stats} />
 
       {isStale && (
-        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+        <p className="text-xs text-amber-500">
           New data available — regenerate for an updated insight.
         </p>
       )}
 
       {!insight && !isGenerating && (
-        <Button onClick={handleGenerate} size="sm">
+        <Button onClick={handleGenerate} className="h-10 px-6">
           Generate Insight
         </Button>
       )}
@@ -73,7 +73,9 @@ export function InsightCard({ stats, initialInsight, isStale: initialIsStale }: 
               Regenerate
             </Button>
           </div>
-          <p className="text-sm leading-relaxed">{insight.narrative}</p>
+          <div className="border-l-2 border-primary/30 pl-4">
+            <p className="text-sm leading-relaxed text-foreground/90">{insight.narrative}</p>
+          </div>
           <InsightPlayer audioUrl={insight.audio_url} />
         </div>
       )}

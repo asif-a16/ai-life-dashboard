@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { LogEntryRow, LogEntryType } from '@/lib/types'
 import { useLogDetailPrefs } from '@/hooks/useLogDetailPrefs'
@@ -16,12 +16,12 @@ const TYPE_LABELS: Record<LogEntryType | 'all', string> = {
   reflection: 'Reflections',
 }
 
-const TYPE_COLORS: Record<LogEntryType, string> = {
-  meal: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  workout: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-  bodyweight: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  mood: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-  reflection: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+const LOG_TYPE_VAR: Record<LogEntryType, string> = {
+  meal: 'var(--log-meal)',
+  workout: 'var(--log-workout)',
+  bodyweight: 'var(--log-bodyweight)',
+  mood: 'var(--log-mood)',
+  reflection: 'var(--log-reflection)',
 }
 
 function summarize(entry: LogEntryRow, level: DetailLevel): string {
@@ -91,24 +91,39 @@ function DateGroup({ dateStr, entries, detailPrefs }: { dateStr: string; entries
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 w-full text-left"
       >
-        <span className="text-sm font-semibold flex-1">{formatDateHeader(dateStr)}</span>
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">
+          {formatDateHeader(dateStr)}
+        </span>
         <Badge variant="secondary" className="text-xs">{entries.length}</Badge>
         <ChevronDown
-          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`}
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-150 ${open ? '' : '-rotate-90'}`}
         />
       </button>
 
       {open && (
         <ul className="space-y-1.5 pl-2">
-          {entries.map((entry) => (
-            <li key={entry.id} className="flex items-start gap-2.5 rounded-md border px-3 py-2">
-              <Badge className={`mt-0.5 shrink-0 text-xs ${TYPE_COLORS[entry.type]}`} variant="secondary">
-                {TYPE_LABELS[entry.type]}
-              </Badge>
-              <p className="text-sm flex-1">{summarize(entry, detailPrefs[entry.type])}</p>
-              <span className="text-xs text-muted-foreground shrink-0">{formatTime(entry.logged_at)}</span>
-            </li>
-          ))}
+          {entries.map((entry) => {
+            const typeVar = LOG_TYPE_VAR[entry.type]
+            return (
+              <li
+                key={entry.id}
+                className="flex items-start gap-2.5 rounded-xl border border-l-2 px-3 py-2"
+                style={{ borderLeftColor: typeVar }}
+              >
+                <span
+                  className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                  style={{
+                    backgroundColor: `color-mix(in oklch, ${typeVar} 12%, transparent)`,
+                    color: typeVar,
+                  }}
+                >
+                  {TYPE_LABELS[entry.type]}
+                </span>
+                <p className="text-sm flex-1">{summarize(entry, detailPrefs[entry.type])}</p>
+                <span className="text-xs text-muted-foreground shrink-0">{formatTime(entry.logged_at)}</span>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
@@ -155,10 +170,10 @@ export function HistoryView({ entries }: HistoryViewProps) {
             <button
               key={t}
               onClick={() => setSelectedType(t)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium ${
                 selectedType === t
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
               }`}
             >
               {TYPE_LABELS[t]}
@@ -171,7 +186,7 @@ export function HistoryView({ entries }: HistoryViewProps) {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="From date"
           />
           <span className="text-sm text-muted-foreground">to</span>
@@ -179,13 +194,13 @@ export function HistoryView({ entries }: HistoryViewProps) {
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="To date"
           />
           {(dateFrom || dateTo) && (
             <button
               onClick={() => { setDateFrom(''); setDateTo('') }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
             </button>
@@ -194,7 +209,11 @@ export function HistoryView({ entries }: HistoryViewProps) {
       </div>
 
       {grouped.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-12">No entries match your filters.</p>
+        <div className="flex flex-col items-center py-12 text-center gap-2">
+          <Clock className="h-9 w-9 text-muted-foreground/30" />
+          <p className="text-sm font-medium text-muted-foreground">No entries match your filters</p>
+          <p className="text-xs text-muted-foreground/60">Try adjusting the type or date range</p>
+        </div>
       ) : (
         <div className="space-y-6">
           {grouped.map(([dateStr, dayEntries]) => (

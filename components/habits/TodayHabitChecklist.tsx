@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CheckSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { HabitCard } from './HabitCard'
@@ -47,9 +48,13 @@ export function TodayHabitChecklist({ habits, showAddForm = true }: TodayHabitCh
   }
 
   return (
-    <div className="space-y-3">
-      {habits.length === 0 && (
-        <p className="text-sm text-muted-foreground">No habits yet. Add your first habit below.</p>
+    <div className="space-y-2">
+      {habits.length === 0 && !showAddForm && (
+        <div className="flex flex-col items-center py-8 text-center gap-2">
+          <CheckSquare className="h-9 w-9 text-muted-foreground/30" />
+          <p className="text-sm font-medium text-muted-foreground">No habits tracked</p>
+          <p className="text-xs text-muted-foreground/60">Add habits on the Habits page</p>
+        </div>
       )}
 
       {habits.map((habit) => (
@@ -57,7 +62,7 @@ export function TodayHabitChecklist({ habits, showAddForm = true }: TodayHabitCh
       ))}
 
       {showAddForm && (
-        <form onSubmit={handleAdd} className="pt-2 space-y-3">
+        <form onSubmit={handleAdd} className="mt-4 rounded-xl border bg-muted/30 p-4 space-y-3">
           <div className="flex gap-2">
             <Input
               placeholder="Habit name"

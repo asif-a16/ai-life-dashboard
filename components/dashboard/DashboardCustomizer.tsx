@@ -1,19 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { Settings2, X } from 'lucide-react'
-import { useDashboardPrefs } from '@/hooks/useDashboardPrefs'
-import { useLogDetailPrefs } from '@/hooks/useLogDetailPrefs'
-import type { DashboardPrefs } from '@/hooks/useDashboardPrefs'
+import { useState, useRef } from 'react'
+import { Settings2, X, GripVertical } from 'lucide-react'
+import type { DashboardPrefs, WidgetKey } from '@/hooks/useDashboardPrefs'
+import type { LogDetailPrefs } from '@/hooks/useLogDetailPrefs'
 import type { LogEntryType } from '@/lib/types'
 
-const WIDGET_OPTIONS: Array<{ key: keyof DashboardPrefs; label: string }> = [
-  { key: 'showHabits', label: "Today's Habits" },
-  { key: 'showRecentLogs', label: 'Recent Entries' },
-  { key: 'showInsight', label: 'Weekly Insight' },
-  { key: 'showWeightChart', label: 'Body Weight Chart' },
-  { key: 'showMacroChart', label: 'Macronutrient Chart' },
-]
+const WIDGET_CONFIG: Record<WidgetKey, { prefKey: keyof DashboardPrefs; label: string }> = {
+  habits: { prefKey: 'showHabits', label: "Today's Habits" },
+  recentLogs: { prefKey: 'showRecentLogs', label: 'Recent Entries' },
+  insight: { prefKey: 'showInsight', label: 'Weekly Insight' },
+  weightChart: { prefKey: 'showWeightChart', label: 'Body Weight Chart' },
+  macroChart: { prefKey: 'showMacroChart', label: 'Macronutrient Chart' },
+}
 
 const DETAIL_TYPES: Array<{ type: LogEntryType; label: string }> = [
   { type: 'meal', label: 'Meals' },
@@ -23,13 +22,38 @@ const DETAIL_TYPES: Array<{ type: LogEntryType; label: string }> = [
   { type: 'reflection', label: 'Reflections' },
 ]
 
-export function DashboardCustomizer() {
-  const [open, setOpen] = useState(false)
-  const [prefs, setPrefs] = useDashboardPrefs()
-  const [detailPrefs, setDetailPrefs] = useLogDetailPrefs()
+interface DashboardCustomizerProps {
+  prefs: DashboardPrefs
+  setPrefs: (prefs: DashboardPrefs) => void
+  detailPrefs: LogDetailPrefs
+  setDetailPrefs: (prefs: LogDetailPrefs) => void
+}
 
-  function toggleWidget(key: keyof DashboardPrefs) {
-    setPrefs({ ...prefs, [key]: !prefs[key] })
+export function DashboardCustomizer({ prefs, setPrefs, detailPrefs, setDetailPrefs }: DashboardCustomizerProps) {
+  const [open, setOpen] = useState(false)
+  const draggedKey = useRef<WidgetKey | null>(null)
+
+  function toggleWidget(prefKey: keyof DashboardPrefs) {
+    setPrefs({ ...prefs, [prefKey]: !prefs[prefKey] })
+  }
+
+  function handleDragStart(key: WidgetKey) {
+    draggedKey.current = key
+  }
+
+  function handleDragOver(e: React.DragEvent, key: WidgetKey) {
+    e.preventDefault()
+    if (draggedKey.current === null || draggedKey.current === key) return
+    const order = [...prefs.widgetOrder]
+    const fromIndex = order.indexOf(draggedKey.current)
+    const toIndex = order.indexOf(key)
+    if (fromIndex === -1 || toIndex === -1) return
+    order.splice(toIndex, 0, order.splice(fromIndex, 1)[0])
+    setPrefs({ ...prefs, widgetOrder: order })
+  }
+
+  function handleDragEnd() {
+    draggedKey.current = null
   }
 
   return (
@@ -63,18 +87,33 @@ export function DashboardCustomizer() {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Sections</p>
-                {WIDGET_OPTIONS.map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={prefs[key]}
-                      onChange={() => toggleWidget(key)}
-                      className="h-4 w-4 rounded border-muted accent-primary"
-                    />
-                    <span className="text-sm">{label}</span>
-                  </label>
-                ))}
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                  Sections — drag to reorder
+                </p>
+                {prefs.widgetOrder.map((key) => {
+                  const { prefKey, label } = WIDGET_CONFIG[key]
+                  return (
+                    <div
+                      key={key}
+                      draggable
+                      onDragStart={() => handleDragStart(key)}
+                      onDragOver={(e) => handleDragOver(e, key)}
+                      onDragEnd={handleDragEnd}
+                      className="flex items-center gap-2 py-1.5 cursor-grab active:cursor-grabbing rounded hover:bg-muted px-1 -mx-1"
+                    >
+                      <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={prefs[prefKey] as boolean}
+                          onChange={() => toggleWidget(prefKey)}
+                          className="h-4 w-4 rounded border-muted accent-primary"
+                        />
+                        <span className="text-sm">{label}</span>
+                      </label>
+                    </div>
+                  )
+                })}
               </div>
 
               <div className="space-y-1">
