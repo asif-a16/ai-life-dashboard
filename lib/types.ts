@@ -176,6 +176,16 @@ export interface RecentEntriesContext {
   recentWorkouts: Array<{ activity: string; duration_min: number; intensity: string; logged_at: string }>
 }
 
+// ─── Voice Intent ─────────────────────────────────────────────────────────────
+
+export type VoiceIntent = 'log' | 'question'
+
+export interface VoiceQuestionResult {
+  text: string
+  audioUrl: string | null
+  transcript: string
+}
+
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export interface Profile {

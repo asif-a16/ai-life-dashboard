@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { transcribeAudio } from '@/lib/voice/elevenLabsSTT'
 import { parseTranscript } from '@/lib/voice/transcriptParser'
+import { classifyIntent } from '@/lib/voice/intentClassifier'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +18,15 @@ export async function POST(request: NextRequest) {
     }
 
     const transcript = await transcribeAudio(audioFile)
-    const parsedEntry = await parseTranscript(transcript)
+    const intent = await classifyIntent(transcript)
 
-    return NextResponse.json({ parsedEntry, transcript })
+    if (intent === 'question') {
+      return NextResponse.json({ intent, transcript })
+    }
+
+    // Log intent — parse and return structured entry for confirmation
+    const parsedEntry = await parseTranscript(transcript)
+    return NextResponse.json({ intent, parsedEntry, transcript })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
