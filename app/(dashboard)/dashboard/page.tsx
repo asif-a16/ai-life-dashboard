@@ -6,6 +6,7 @@ import { TodayHabitChecklist } from '@/components/habits/TodayHabitChecklist'
 import { RecentLogList } from '@/components/logging/RecentLogList'
 import { InsightCard } from '@/components/insights/InsightCard'
 import { SeedButton } from '@/components/dashboard/SeedButton'
+import { BodyweightChart } from '@/components/charts/BodyweightChart'
 import { computeDashboardStats } from '@/lib/ai/computeStats'
 import type { Habit, HabitLog, HabitWithLog, InsightCache, LogEntryRow } from '@/lib/types'
 
@@ -59,6 +60,7 @@ export default async function DashboardPage() {
     { data: todayLogs },
     stats,
     { data: cachedInsight },
+    { data: bwEntries },
   ] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user!.id).single(),
     supabase
@@ -92,6 +94,12 @@ export default async function DashboardPage() {
       .eq('period_end', today)
       .gte('created_at', twentyFourHoursAgo)
       .single(),
+    supabase
+      .from('log_entries')
+      .select('data, logged_at')
+      .eq('user_id', user!.id)
+      .eq('type', 'bodyweight')
+      .order('logged_at', { ascending: true }),
   ])
 
   // Check if insight is stale (new entries added after last generation)
@@ -165,6 +173,15 @@ export default async function DashboardPage() {
               initialInsight={cachedInsight as InsightCache | null}
               isStale={isStale}
             />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Body Weight</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BodyweightChart entries={bwEntries ?? []} />
           </CardContent>
         </Card>
       </div>

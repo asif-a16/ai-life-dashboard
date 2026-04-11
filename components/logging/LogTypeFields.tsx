@@ -74,6 +74,38 @@ export function LogTypeFields({ type, value, onChange }: LogTypeFieldsProps) {
             />
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="fat_g">Fat (g)</Label>
+            <Input
+              id="fat_g"
+              type="number"
+              placeholder="e.g. 15"
+              value={(value.fat_g as number) ?? ''}
+              onChange={(e) => update('fat_g', e.target.value ? Number(e.target.value) : null)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="carbs_g">Carbs (g)</Label>
+            <Input
+              id="carbs_g"
+              type="number"
+              placeholder="e.g. 45"
+              value={(value.carbs_g as number) ?? ''}
+              onChange={(e) => update('carbs_g', e.target.value ? Number(e.target.value) : null)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="salt_mg">Salt (mg)</Label>
+            <Input
+              id="salt_mg"
+              type="number"
+              placeholder="e.g. 800"
+              value={(value.salt_mg as number) ?? ''}
+              onChange={(e) => update('salt_mg', e.target.value ? Number(e.target.value) : null)}
+            />
+          </div>
+        </div>
       </div>
     )
   }

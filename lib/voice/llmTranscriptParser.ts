@@ -12,7 +12,7 @@ Return ONLY valid JSON with this exact shape:
 }
 
 Type-specific data fields:
-- meal: { "description": string, "calories": number|null, "protein_g": number|null, "meal_type": "breakfast"|"lunch"|"dinner"|"snack" }
+- meal: { "description": string, "calories": number|null, "protein_g": number|null, "fat_g": number|null, "carbs_g": number|null, "salt_mg": number|null, "meal_type": "breakfast"|"lunch"|"dinner"|"snack" }
 - workout: { "activity": string, "duration_min": number, "intensity": "light"|"moderate"|"hard", "distance_km": number|null }
 - bodyweight: { "weight_kg": number, "unit": "kg"|"lbs" }
 - mood: { "score": number 1-10, "emotions": string[], "energy_level": number 1-10 }

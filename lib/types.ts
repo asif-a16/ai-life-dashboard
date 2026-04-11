@@ -6,6 +6,9 @@ export const MealDataSchema = z.object({
   description: z.string().min(1),
   calories: z.number().nullable(),
   protein_g: z.number().nullable(),
+  fat_g: z.number().nullable().optional(),
+  carbs_g: z.number().nullable().optional(),
+  salt_mg: z.number().nullable().optional(),
   meal_type: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
 })
 
@@ -48,6 +51,13 @@ export const LogEntrySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('reflection'), data: ReflectionDataSchema, notes: z.string().optional(), logged_at: z.string().nullable().optional(), voice_transcript: z.string().optional() }),
 ])
 export type LogEntry = z.infer<typeof LogEntrySchema>
+
+export const LogEntryUpdateSchema = z.object({
+  id: z.string().uuid(),
+  data: z.record(z.string(), z.unknown()),
+  notes: z.string().optional(),
+  logged_at: z.string().optional(),
+})
 
 export type MealData = z.infer<typeof MealDataSchema>
 export type WorkoutData = z.infer<typeof WorkoutDataSchema>
@@ -192,6 +202,7 @@ export interface Profile {
   id: string
   display_name: string
   timezone: string
+  onboarded_at: string | null
   created_at: string
   updated_at: string
 }

@@ -110,6 +110,9 @@ export function mockParseTranscript(transcript: string): ParsedLogEntry {
     const protein = proteinMatch
       ? parseInt(proteinMatch[1] !== undefined ? proteinMatch[1] : proteinMatch[3])
       : null
+    const fatMatch = transcript.match(/(\d+(?:\.\d+)?)\s*g?\s*(?:of\s+)?fat/i)
+    const carbsMatch = transcript.match(/(\d+(?:\.\d+)?)\s*g?\s*(?:of\s+)?carbs?/i)
+    const saltMatch = transcript.match(/(\d+(?:\.\d+)?)\s*mg?\s*(?:of\s+)?salt/i)
     const description = extractMealDescription(transcript)
     console.log('[parser] classified as meal — description:', description, 'calories:', calories)
     return {
@@ -120,6 +123,9 @@ export function mockParseTranscript(transcript: string): ParsedLogEntry {
         description,
         calories,
         protein_g: protein,
+        fat_g: fatMatch ? parseFloat(fatMatch[1]) : null,
+        carbs_g: carbsMatch ? parseFloat(carbsMatch[1]) : null,
+        salt_mg: saltMatch ? parseFloat(saltMatch[1]) : null,
         meal_type: extractMealType(lower),
       },
     }
