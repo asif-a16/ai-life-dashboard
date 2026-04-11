@@ -31,7 +31,16 @@
       "Bash(npx tsc:*)",
       "Bash(node -e \"const ICAL = require\\('ical.js'\\); console.log\\(typeof ICAL.parse\\);\")",
       "Bash(node -e ':*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(node -e \"const { PSTFile } = require\\('pst-extractor'\\); console.log\\(PSTFile.toString\\(\\).slice\\(0, 300\\)\\)\")",
+      "Bash(node -e \"const m = require\\('pst-extractor'\\); console.log\\(Object.keys\\(m\\)\\)\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/calendar/import/pst -F \"file=@/dev/null\")",
+      "Bash(curl -sv http://localhost:3000/api/calendar/import/pst -X POST -F \"file=@package.json\")",
+      "Bash(node -e \" const next = require\\('next/package.json'\\); console.log\\('Next.js version:', next.version\\); \")",
+      "Bash(curl -sv -X POST http://localhost:3000/api/calendar/import/pst -F file=@node_modules/next/dist/server/capsize-font-metrics.json)",
+      "Bash(rm lib/calendar/parsePST.ts components/calendar/PSTUploader.tsx app/api/calendar/import/pst/route.ts supabase/migrations/004_calendar_rls_update.sql docs/plans/phase-12-pst-import.md)",
+      "Bash(rmdir app/api/calendar/import/pst app/api/calendar/import)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

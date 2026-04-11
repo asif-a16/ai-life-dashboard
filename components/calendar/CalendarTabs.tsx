@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ICSUploader } from './ICSUploader'
-import { PSTUploader } from './PSTUploader'
 import { MonthGrid } from './MonthGrid'
 import { DayLogView } from './DayLogView'
 import type { CalendarEvent } from '@/lib/types'
@@ -44,15 +43,8 @@ export function CalendarTabs({ events, logDates, userId }: CalendarTabsProps) {
               Upload an .ics file to import upcoming events. Re-uploading the same file will update existing events.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Import .ics file</p>
-              <ICSUploader />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Import from Outlook</p>
-              <PSTUploader />
-            </div>
+          <CardContent>
+            <ICSUploader />
           </CardContent>
         </Card>
 
