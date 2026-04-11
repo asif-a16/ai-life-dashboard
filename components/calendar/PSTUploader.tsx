@@ -23,17 +23,25 @@ export function PSTUploader() {
       formData.append('file', file)
 
       const res = await fetch('/api/calendar/import/pst', { method: 'POST', body: formData })
-      const json = await res.json() as { data?: { imported: number; skipped: number }; error?: string }
+
+      let json: { data?: { imported: number; skipped: number }; error?: string }
+      try {
+        json = await res.json() as typeof json
+      } catch {
+        const text = await res.text().catch(() => `HTTP ${res.status}`)
+        setError(`Import failed (${res.status}): ${text.slice(0, 120)}`)
+        return
+      }
 
       if (!res.ok) {
         setError(json.error ?? 'Import failed')
         return
       }
 
-      toast(`Imported ${json.data!.imported} events from Outlook`)
+      toast(`Imported ${json.data?.imported ?? 0} events from Outlook`)
       router.refresh()
-    } catch {
-      setError('Failed to import PST file. Please try again.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to import PST file. Please try again.')
     } finally {
       setIsLoading(false)
       if (inputRef.current) inputRef.current.value = ''

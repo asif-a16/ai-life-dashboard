@@ -31,10 +31,14 @@ export async function POST(request: Request) {
       .upsert(rows, { onConflict: 'user_id,ics_uid', ignoreDuplicates: false })
       .select('id')
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('[PST import] Supabase upsert error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     return NextResponse.json({ data: { imported: (data ?? []).length, skipped: events.length - (data ?? []).length } })
   } catch (e) {
+    console.error('[PST import] Unexpected error:', e)
     const message = e instanceof Error ? e.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
