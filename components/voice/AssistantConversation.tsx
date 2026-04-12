@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Conversation } from '@elevenlabs/client'
@@ -18,7 +18,7 @@ import {
   MoodDataSchema,
   ReflectionDataSchema,
 } from '@/lib/types'
-import type { AssistantMessage, AssistantDraft, LogEntryType } from '@/lib/types'
+import type { AssistantDraft, LogEntryType } from '@/lib/types'
 
 type AnyConversation = VoiceConversation | TextConversation
 
@@ -30,11 +30,14 @@ const TYPE_LABELS: Record<LogEntryType, string> = {
   reflection: 'Reflection',
 }
 
-export function AssistantConversation() {
+interface AssistantConversationProps {
+  onClose: () => void
+}
+
+export function AssistantConversation({ onClose }: AssistantConversationProps) {
   const router = useRouter()
   const [connStatus, setConnStatus] = useState<Status>('disconnected')
   const [agentMode, setAgentMode] = useState<Mode | null>(null)
-  const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [pendingDraft, setPendingDraft] = useState<AssistantDraft | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -42,10 +45,15 @@ export function AssistantConversation() {
   const [draftNotes, setDraftNotes] = useState('')
 
   const conversationRef = useRef<AnyConversation | null>(null)
+  const wasConnectedRef = useRef(false)
 
-  function addMessage(role: 'user' | 'agent', text: string) {
-    setMessages(prev => [...prev, { source: role, text }])
-  }
+  // Auto-close shortly after session ends (skip if a draft is pending)
+  useEffect(() => {
+    if (connStatus === 'disconnected' && wasConnectedRef.current && !pendingDraft) {
+      const timer = setTimeout(() => onClose(), 800)
+      return () => clearTimeout(timer)
+    }
+  }, [connStatus, pendingDraft, onClose])
 
   async function callReadTool(toolName: string): Promise<string> {
     try {
@@ -90,6 +98,7 @@ export function AssistantConversation() {
         signedUrl: json.data!.signedUrl,
         onStatusChange: ({ status }) => {
           setConnStatus(status)
+          if (status === 'connected') wasConnectedRef.current = true
           if (status === 'disconnected') {
             setAgentMode(null)
             conversationRef.current = null
@@ -97,9 +106,6 @@ export function AssistantConversation() {
         },
         onError: (message) => {
           setError(typeof message === 'string' ? message : 'Connection error')
-        },
-        onMessage: ({ message, role }) => {
-          if (message.trim()) addMessage(role, message)
         },
         onModeChange: ({ mode }) => setAgentMode(mode),
         clientTools: {
@@ -173,6 +179,15 @@ export function AssistantConversation() {
     }
   }
 
+  // Auto-start on mount; end session on unmount
+  useEffect(() => {
+    handleStartConversation()
+    return () => {
+      conversationRef.current?.endSession()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function handleEndConversation() {
     if (conversationRef.current) {
       await conversationRef.current.endSession()
@@ -224,77 +239,81 @@ export function AssistantConversation() {
     setPendingDraft(null)
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ─── Connecting / Disconnecting ───────────────────────────────────────────
+
+  if (connStatus === 'connecting' || connStatus === 'disconnecting') {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          {connStatus === 'connecting' ? 'Connecting...' : 'Ending session...'}
+        </p>
+      </div>
+    )
+  }
+
+  // ─── Disconnected (initial load spinner or error) ─────────────────────────
 
   if (connStatus === 'disconnected') {
     return (
-      <div className="flex flex-col items-center gap-4 py-4">
-        <p className="text-sm text-muted-foreground text-center">
-          Chat with your health assistant. Ask questions or log entries by voice.
-        </p>
-        {error && <p className="text-sm text-destructive text-center">{error}</p>}
-        <Button onClick={handleStartConversation} className="w-full">
-          <Mic className="h-4 w-4 mr-2" />
-          Start Conversation
-        </Button>
+      <div className="flex flex-col items-center gap-4 py-10">
+        {error ? (
+          <>
+            <p className="text-sm text-destructive text-center">{error}</p>
+            <Button onClick={handleStartConversation} size="sm">
+              Try Again
+            </Button>
+          </>
+        ) : (
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        )}
       </div>
     )
   }
 
-  if (connStatus === 'connecting') {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Connecting...</p>
-      </div>
-    )
-  }
+  // ─── Connected ────────────────────────────────────────────────────────────
 
-  if (connStatus === 'disconnecting') {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Ending session...</p>
-      </div>
-    )
-  }
-
-  // connected
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Badge variant={agentMode === 'speaking' ? 'default' : 'secondary'}>
-          {agentMode === 'speaking' ? 'Speaking' : 'Listening'}
-        </Badge>
-        <Button
-          onClick={handleEndConversation}
-          variant="outline"
-          size="sm"
-          className="text-destructive border-destructive/40 hover:bg-destructive/10"
+    <div className="flex flex-col items-center gap-5">
+      {/* Animated mic indicator */}
+      <div className="relative flex items-center justify-center h-36 w-36">
+        {agentMode === 'speaking' && (
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+        )}
+        <div
+          className={`absolute inset-4 rounded-full transition-colors duration-300 ${
+            agentMode === 'speaking' ? 'animate-pulse bg-primary/30' : 'animate-pulse bg-muted'
+          }`}
+        />
+        <div
+          className={`relative flex h-16 w-16 items-center justify-center rounded-full transition-colors duration-300 ${
+            agentMode === 'speaking' ? 'bg-primary' : 'bg-muted-foreground/20'
+          }`}
         >
-          <PhoneOff className="h-4 w-4 mr-1.5" />
-          End
-        </Button>
+          <Mic
+            className={`h-7 w-7 transition-colors duration-300 ${
+              agentMode === 'speaking' ? 'text-primary-foreground' : 'text-muted-foreground'
+            }`}
+          />
+        </div>
       </div>
 
-      {messages.length > 0 && (
-        <div className="space-y-2 max-h-48 overflow-y-auto rounded-lg border p-3">
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`text-sm ${msg.source === 'agent' ? 'text-foreground' : 'text-muted-foreground'}`}
-            >
-              <span className="text-xs font-medium uppercase tracking-wide mr-2">
-                {msg.source === 'agent' ? 'Assistant' : 'You'}
-              </span>
-              {msg.text}
-            </div>
-          ))}
-        </div>
-      )}
+      <p className="text-sm font-medium text-muted-foreground">
+        {agentMode === 'speaking' ? 'Speaking...' : 'Listening...'}
+      </p>
+
+      <Button
+        onClick={handleEndConversation}
+        variant="outline"
+        size="sm"
+        className="text-destructive border-destructive/40 hover:bg-destructive/10"
+      >
+        <PhoneOff className="h-4 w-4 mr-1.5" />
+        End Session
+      </Button>
 
       {pendingDraft && (
-        <div className="rounded-lg border p-4 space-y-4 bg-muted/30">
+        <div className="w-full rounded-lg border p-4 space-y-4 bg-muted/30">
           <div className="flex items-center justify-between">
             <Badge variant="secondary">{TYPE_LABELS[pendingDraft.entry.type]}</Badge>
             <button

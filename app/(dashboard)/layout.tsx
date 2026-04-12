@@ -28,7 +28,7 @@ export default async function DashboardLayout({
         <main className="flex-1 overflow-y-auto pb-24">
           {children}
         </main>
-        <VoiceFab hasAssistant={!!process.env.ELEVENLABS_AGENT_ID} />
+        <VoiceFab />
       </div>
     </div>
   )
