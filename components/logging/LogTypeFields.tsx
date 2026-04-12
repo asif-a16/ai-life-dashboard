@@ -28,7 +28,11 @@ interface RecipeSearchResult {
   nutrition_per_100g: NutritionPer100g | null
 }
 
-function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onChange: (data: Record<string, unknown>) => void }) {
+function FoodSearch({ value, onChange, onNutritionSelect }: {
+  value: Record<string, unknown>
+  onChange: (data: Record<string, unknown>) => void
+  onNutritionSelect: (nutrition: NutritionPer100g | null) => void
+}) {
   const [foods, setFoods] = useState<CustomFood[]>([])
   const [recipes, setRecipes] = useState<RecipeSearchResult[]>([])
   const [query, setQuery] = useState('')
@@ -70,6 +74,14 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
     const weight = typeof value.weight_g === 'number' && value.weight_g > 0
       ? (value.weight_g as number)
       : 100
+    const nutritionPer100g: NutritionPer100g = {
+      calories_per_100g: food.calories_per_100g,
+      protein_per_100g: food.protein_per_100g,
+      fat_per_100g: food.fat_per_100g,
+      carbs_per_100g: food.carbs_per_100g,
+      salt_per_100g: food.salt_per_100g,
+    }
+    onNutritionSelect(nutritionPer100g)
     const nutrition = calcFoodNutrition(food, weight)
     onChange({
       ...value,
@@ -91,6 +103,7 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
     const weight = typeof value.weight_g === 'number' && value.weight_g > 0
       ? (value.weight_g as number)
       : 100
+    onNutritionSelect(recipe.nutrition_per_100g)
     const nutrition = recipe.nutrition_per_100g
       ? calcRecipeNutrition(recipe.nutrition_per_100g, weight)
       : { calories: null, protein_g: null, fat_g: null, carbs_g: null, salt_mg: null }
@@ -111,6 +124,7 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
   }
 
   function clearSelection() {
+    onNutritionSelect(null)
     onChange({ ...value, food_id: null, recipe_id: null, weight_g: null })
   }
 
@@ -190,39 +204,23 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
 }
 
 export function LogTypeFields({ type, value, onChange }: LogTypeFieldsProps) {
+  // Cached per-100g nutrition for the currently selected food or recipe.
+  // Updated synchronously on selection — eliminates fetch-on-keystroke lag.
+  const nutritionCacheRef = useRef<NutritionPer100g | null>(null)
+
   function update(key: string, val: unknown) {
     onChange({ ...value, [key]: val })
   }
 
   function updateWeight(weight_g: number | null) {
-    const food_id = value.food_id as string | null | undefined
-    const recipe_id = value.recipe_id as string | null | undefined
-
     if (weight_g === null) {
       onChange({ ...value, weight_g })
       return
     }
-
-    if (food_id) {
-      fetch('/api/foods')
-        .then((r) => r.json())
-        .then((j: { data?: CustomFood[] }) => {
-          const food = (j.data ?? []).find((f) => f.id === food_id)
-          if (!food) { onChange({ ...value, weight_g }); return }
-          const nutrition = calcFoodNutrition(food, weight_g)
-          onChange({ ...value, weight_g, calories: nutrition.calories, protein_g: nutrition.protein_g, fat_g: nutrition.fat_g, carbs_g: nutrition.carbs_g, salt_mg: nutrition.salt_mg })
-        })
-        .catch(() => onChange({ ...value, weight_g }))
-    } else if (recipe_id) {
-      fetch('/api/recipes')
-        .then((r) => r.json())
-        .then((j: { data?: RecipeSearchResult[] }) => {
-          const recipe = (j.data ?? []).find((r) => r.id === recipe_id)
-          if (!recipe?.nutrition_per_100g) { onChange({ ...value, weight_g }); return }
-          const nutrition = calcRecipeNutrition(recipe.nutrition_per_100g, weight_g)
-          onChange({ ...value, weight_g, calories: nutrition.calories, protein_g: nutrition.protein_g, fat_g: nutrition.fat_g, carbs_g: nutrition.carbs_g, salt_mg: nutrition.salt_mg })
-        })
-        .catch(() => onChange({ ...value, weight_g }))
+    const cached = nutritionCacheRef.current
+    if (cached) {
+      const snap = calcRecipeNutrition(cached, weight_g)
+      onChange({ ...value, weight_g, calories: snap.calories, protein_g: snap.protein_g, fat_g: snap.fat_g, carbs_g: snap.carbs_g, salt_mg: snap.salt_mg })
     } else {
       onChange({ ...value, weight_g })
     }
@@ -233,7 +231,7 @@ export function LogTypeFields({ type, value, onChange }: LogTypeFieldsProps) {
 
     return (
       <div className="space-y-4">
-        <FoodSearch value={value} onChange={onChange} />
+        <FoodSearch value={value} onChange={onChange} onNutritionSelect={(n) => { nutritionCacheRef.current = n }} />
 
         {hasSelection && (
           <div className="space-y-1.5">
