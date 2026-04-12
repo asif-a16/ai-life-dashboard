@@ -50,6 +50,7 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
   const [loggedAt, setLoggedAt] = useState(() => toDatetimeLocal(new Date()))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showDatetime, setShowDatetime] = useState(false)
 
   function handleDataChange(data: Record<string, unknown>) {
     setFormData((prev) => ({ ...prev, [selectedType]: data }))
@@ -99,15 +100,27 @@ export function LogEntryForm({ prefill }: LogEntryFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-1.5">
-        <Label htmlFor="logged-at">When</Label>
-        <Input
-          id="logged-at"
-          type="datetime-local"
-          value={loggedAt}
-          max={tomorrowMax()}
-          onChange={(e) => setLoggedAt(e.target.value)}
-        />
+      <div>
+        {!showDatetime ? (
+          <button
+            type="button"
+            onClick={() => setShowDatetime(true)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Logged just now · <span className="underline underline-offset-2">Change time</span>
+          </button>
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="logged-at">When</Label>
+            <Input
+              id="logged-at"
+              type="datetime-local"
+              value={loggedAt}
+              max={tomorrowMax()}
+              onChange={(e) => setLoggedAt(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as LogEntryType)}>

@@ -20,10 +20,6 @@ export default async function LogPage() {
     <>
       <TopNav title="Log Entry" />
       <div className="p-6 max-w-2xl mx-auto space-y-6">
-        <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Tip: Use the <strong className="text-foreground">microphone button</strong> in the top bar to log by voice.
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>New Entry</CardTitle>

@@ -47,14 +47,6 @@ export function AssistantConversation({ onClose }: AssistantConversationProps) {
   const conversationRef = useRef<AnyConversation | null>(null)
   const wasConnectedRef = useRef(false)
 
-  // Auto-close shortly after session ends (skip if a draft is pending)
-  useEffect(() => {
-    if (connStatus === 'disconnected' && wasConnectedRef.current && !pendingDraft) {
-      const timer = setTimeout(() => onClose(), 800)
-      return () => clearTimeout(timer)
-    }
-  }, [connStatus, pendingDraft, onClose])
-
   async function callReadTool(toolName: string): Promise<string> {
     try {
       const res = await fetch('/api/assistant/tool', {
@@ -180,13 +172,11 @@ export function AssistantConversation({ onClose }: AssistantConversationProps) {
     }
   }
 
-  // Auto-start on mount; end session on unmount
+  // End session on unmount
   useEffect(() => {
-    handleStartConversation()
     return () => {
       conversationRef.current?.endSession()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleEndConversation() {
@@ -253,21 +243,34 @@ export function AssistantConversation({ onClose }: AssistantConversationProps) {
     )
   }
 
-  // ─── Disconnected (initial load spinner or error) ─────────────────────────
+  // ─── Disconnected ─────────────────────────────────────────────────────────
 
   if (connStatus === 'disconnected') {
+    // Session just ended
+    if (wasConnectedRef.current) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-8 text-center">
+          <p className="text-sm font-medium">Session ended</p>
+          <p className="text-sm text-muted-foreground">Check Recent Entries to see what was logged.</p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button onClick={onClose} size="sm" variant="outline">
+            Close
+          </Button>
+        </div>
+      )
+    }
+
+    // Initial state or error before connecting
     return (
-      <div className="flex flex-col items-center gap-4 py-10">
-        {error ? (
-          <>
-            <p className="text-sm text-destructive text-center">{error}</p>
-            <Button onClick={handleStartConversation} size="sm">
-              Try Again
-            </Button>
-          </>
-        ) : (
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        )}
+      <div className="flex flex-col items-center gap-4 py-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          Ask questions about your health data or log entries by voice.
+        </p>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button onClick={handleStartConversation} className="w-full">
+          <Mic className="h-4 w-4 mr-2" />
+          Start Conversation
+        </Button>
       </div>
     )
   }

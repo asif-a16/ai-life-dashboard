@@ -57,6 +57,14 @@ export function TodayHabitChecklist({ habits, showAddForm = true }: TodayHabitCh
         </div>
       )}
 
+      {habits.length === 0 && showAddForm && (
+        <div className="flex flex-col items-center py-6 text-center gap-1 mb-2">
+          <CheckSquare className="h-8 w-8 text-muted-foreground/30" />
+          <p className="text-sm font-medium text-muted-foreground">No habits yet</p>
+          <p className="text-xs text-muted-foreground/60">Habits are daily goals you check off. Build a streak by completing them every day.</p>
+        </div>
+      )}
+
       {habits.map((habit) => (
         <HabitCard key={habit.id} habit={habit} />
       ))}

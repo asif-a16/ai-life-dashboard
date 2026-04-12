@@ -46,9 +46,12 @@ export function InsightCard({ stats, initialInsight, isStale: initialIsStale }: 
       )}
 
       {!insight && !isGenerating && (
-        <Button onClick={handleGenerate} className="h-10 px-6">
-          Generate Insight
-        </Button>
+        <div>
+          <Button onClick={handleGenerate} className="h-10 px-6">
+            Generate Insight
+          </Button>
+          <p className="text-xs text-muted-foreground mt-1.5">Takes around 10 seconds</p>
+        </div>
       )}
 
       {isGenerating && (

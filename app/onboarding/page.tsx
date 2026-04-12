@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { LogEntryForm } from '@/components/logging/LogEntryForm'
+import { Textarea } from '@/components/ui/textarea'
 
 type Step = 1 | 2 | 3
 
@@ -37,6 +37,9 @@ export default function OnboardingPage() {
   const [habitName, setHabitName] = useState('')
   const [habitColor, setHabitColor] = useState(PRESET_COLORS[0])
   const [isLoading, setIsLoading] = useState(false)
+  const [firstEntry, setFirstEntry] = useState('')
+  const [entryLogged, setEntryLogged] = useState(false)
+  const [isLoggingEntry, setIsLoggingEntry] = useState(false)
 
   async function handleSkip() {
     setIsLoading(true)
@@ -62,6 +65,24 @@ export default function OnboardingPage() {
       }
     }
     setStep(3)
+  }
+
+  async function handleLogEntry() {
+    if (!firstEntry.trim()) return
+    setIsLoggingEntry(true)
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'reflection', data: { content: firstEntry.trim() } }),
+      })
+      setEntryLogged(true)
+      toast('Entry logged')
+    } catch {
+      // non-fatal
+    } finally {
+      setIsLoggingEntry(false)
+    }
   }
 
   async function handleFinish() {
@@ -144,17 +165,38 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="space-y-6">
             <div className="space-y-1">
-              <h2 className="text-2xl font-bold">Log your first entry</h2>
+              <h2 className="text-2xl font-bold">You&apos;re all set</h2>
               <p className="text-muted-foreground text-sm">
-                Log a meal, workout, weight, or how you&apos;re feeling right now.
+                Optionally, describe something from today to make your first log entry.
               </p>
             </div>
-            <LogEntryForm />
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleFinish} disabled={isLoading} variant="outline" className="w-full">
-                {isLoading ? 'Loading...' : 'Go to dashboard'}
-              </Button>
-            </div>
+            {entryLogged ? (
+              <p className="text-sm text-green-600 dark:text-green-400 font-medium">Logged! ✓</p>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="first-entry">Describe something from today (optional)</Label>
+                <Textarea
+                  id="first-entry"
+                  placeholder="e.g. Had oatmeal for breakfast, went for a 30-min walk, feeling good today..."
+                  value={firstEntry}
+                  onChange={(e) => setFirstEntry(e.target.value)}
+                  className="resize-none"
+                  rows={3}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogEntry}
+                  disabled={isLoggingEntry || !firstEntry.trim()}
+                >
+                  {isLoggingEntry ? 'Logging...' : 'Log it'}
+                </Button>
+              </div>
+            )}
+            <Button onClick={handleFinish} disabled={isLoading} className="w-full">
+              {isLoading ? 'Loading...' : 'Go to dashboard'}
+            </Button>
           </div>
         )}
       </div>

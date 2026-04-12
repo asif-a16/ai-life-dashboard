@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, Clock, Pencil, X, Check } from 'lucide-react'
+import { ChevronDown, Clock, Pencil, Trash2, X, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -97,6 +97,7 @@ function formatDateHeader(dateStr: string): string {
 
 interface EditState {
   editingId: string | null
+  deletingId: string | null
   editData: Record<string, unknown>
   editNotes: string
   isSaving: boolean
@@ -106,6 +107,7 @@ interface EditState {
   onEditStart: (entry: LogEntryRow) => void
   onEditCancel: () => void
   onEditSave: (entry: LogEntryRow) => void
+  onDelete: (id: string) => void
 }
 
 function DateGroup({
@@ -224,6 +226,16 @@ function DateGroup({
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-6 w-6 text-muted-foreground hover:text-destructive -mt-0.5"
+                      onClick={() => edit.onDelete(entry.id)}
+                      disabled={edit.deletingId === entry.id}
+                      aria-label="Delete entry"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 )}
               </li>
@@ -249,10 +261,21 @@ export function HistoryView({ entries }: HistoryViewProps) {
   const [dateTo, setDateTo] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, unknown>>({})
   const [editNotes, setEditNotes] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    try {
+      await fetch(`/api/log?id=${id}`, { method: 'DELETE' })
+      router.refresh()
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   function handleEditStart(entry: LogEntryRow) {
     setEditingId(entry.id)
@@ -293,6 +316,7 @@ export function HistoryView({ entries }: HistoryViewProps) {
 
   const edit: EditState = {
     editingId,
+    deletingId,
     editData,
     editNotes,
     isSaving,
@@ -302,6 +326,7 @@ export function HistoryView({ entries }: HistoryViewProps) {
     onEditStart: handleEditStart,
     onEditCancel: handleEditCancel,
     onEditSave: handleEditSave,
+    onDelete: handleDelete,
   }
 
   const filtered = useMemo(() => {
