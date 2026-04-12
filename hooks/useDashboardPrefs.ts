@@ -15,12 +15,12 @@ export interface DashboardPrefs {
 
 const STORAGE_KEY = 'dashboard-prefs'
 
-const DEFAULT_ORDER: WidgetKey[] = ['habits', 'recentLogs', 'insight', 'weightChart', 'macroChart']
+const DEFAULT_ORDER: WidgetKey[] = ['macroChart', 'weightChart', 'recentLogs', 'habits', 'insight']
 
 const DEFAULTS: DashboardPrefs = {
   showHabits: true,
   showRecentLogs: true,
-  showInsight: true,
+  showInsight: false,
   showWeightChart: true,
   showMacroChart: true,
   widgetOrder: DEFAULT_ORDER,
