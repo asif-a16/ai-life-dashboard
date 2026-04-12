@@ -1,8 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ChevronDown, Clock } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronDown, Clock, Pencil, X, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { LogTypeFields } from '@/components/logging/LogTypeFields'
 import type { LogEntryRow, LogEntryType } from '@/lib/types'
 import { useLogDetailPrefs } from '@/hooks/useLogDetailPrefs'
 import type { DetailLevel } from '@/hooks/useLogDetailPrefs'
@@ -14,6 +19,14 @@ const TYPE_LABELS: Record<LogEntryType | 'all', string> = {
   bodyweight: 'Weight',
   mood: 'Mood',
   reflection: 'Reflections',
+}
+
+const TYPE_LABELS_SINGULAR: Record<LogEntryType, string> = {
+  meal: 'Meal',
+  workout: 'Workout',
+  bodyweight: 'Weight',
+  mood: 'Mood',
+  reflection: 'Reflection',
 }
 
 const LOG_TYPE_VAR: Record<LogEntryType, string> = {
@@ -82,7 +95,30 @@ function formatDateHeader(dateStr: string): string {
   })
 }
 
-function DateGroup({ dateStr, entries, detailPrefs }: { dateStr: string; entries: LogEntryRow[]; detailPrefs: Record<LogEntryType, DetailLevel> }) {
+interface EditState {
+  editingId: string | null
+  editData: Record<string, unknown>
+  editNotes: string
+  isSaving: boolean
+  editError: string | null
+  setEditData: (data: Record<string, unknown>) => void
+  setEditNotes: (notes: string) => void
+  onEditStart: (entry: LogEntryRow) => void
+  onEditCancel: () => void
+  onEditSave: (entry: LogEntryRow) => void
+}
+
+function DateGroup({
+  dateStr,
+  entries,
+  detailPrefs,
+  edit,
+}: {
+  dateStr: string
+  entries: LogEntryRow[]
+  detailPrefs: Record<LogEntryType, DetailLevel>
+  edit: EditState
+}) {
   const [open, setOpen] = useState(true)
 
   return (
@@ -107,20 +143,89 @@ function DateGroup({ dateStr, entries, detailPrefs }: { dateStr: string; entries
             return (
               <li
                 key={entry.id}
-                className="flex items-start gap-2.5 rounded-xl border border-l-2 px-3 py-2"
+                className="rounded-xl border border-l-2 px-3 py-2"
                 style={{ borderLeftColor: typeVar }}
               >
-                <span
-                  className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{
-                    backgroundColor: `color-mix(in oklch, ${typeVar} 12%, transparent)`,
-                    color: typeVar,
-                  }}
-                >
-                  {TYPE_LABELS[entry.type]}
-                </span>
-                <p className="text-sm flex-1">{summarize(entry, detailPrefs[entry.type])}</p>
-                <span className="text-xs text-muted-foreground shrink-0">{formatTime(entry.logged_at)}</span>
+                {edit.editingId === entry.id ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{
+                          backgroundColor: `color-mix(in oklch, ${typeVar} 12%, transparent)`,
+                          color: typeVar,
+                        }}
+                      >
+                        {TYPE_LABELS_SINGULAR[entry.type]}
+                      </span>
+                      <button
+                        onClick={edit.onEditCancel}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Cancel edit"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <LogTypeFields
+                      type={entry.type}
+                      value={edit.editData}
+                      onChange={edit.setEditData}
+                    />
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`notes-${entry.id}`}>Notes</Label>
+                      <Textarea
+                        id={`notes-${entry.id}`}
+                        value={edit.editNotes}
+                        onChange={(e) => edit.setEditNotes(e.target.value)}
+                        placeholder="Any additional context..."
+                        className="resize-none"
+                        rows={2}
+                      />
+                    </div>
+
+                    {edit.editError && <p className="text-sm text-destructive">{edit.editError}</p>}
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => edit.onEditSave(entry)}
+                        disabled={edit.isSaving}
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1.5" />
+                        {edit.isSaving ? 'Saving...' : 'Save'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={edit.onEditCancel}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: `color-mix(in oklch, ${typeVar} 12%, transparent)`,
+                        color: typeVar,
+                      }}
+                    >
+                      {TYPE_LABELS_SINGULAR[entry.type]}
+                    </span>
+                    <p className="text-sm flex-1">{summarize(entry, detailPrefs[entry.type])}</p>
+                    <span className="text-xs text-muted-foreground shrink-0">{formatTime(entry.logged_at)}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-6 w-6 text-muted-foreground hover:text-foreground -mt-0.5"
+                      onClick={() => edit.onEditStart(entry)}
+                      aria-label="Edit entry"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </li>
             )
           })}
@@ -137,10 +242,67 @@ interface HistoryViewProps {
 }
 
 export function HistoryView({ entries }: HistoryViewProps) {
+  const router = useRouter()
   const [detailPrefs] = useLogDetailPrefs()
   const [selectedType, setSelectedType] = useState<LogEntryType | 'all'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editData, setEditData] = useState<Record<string, unknown>>({})
+  const [editNotes, setEditNotes] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  function handleEditStart(entry: LogEntryRow) {
+    setEditingId(entry.id)
+    setEditData(entry.data as Record<string, unknown>)
+    setEditNotes(entry.notes ?? '')
+    setEditError(null)
+  }
+
+  function handleEditCancel() {
+    setEditingId(null)
+    setEditData({})
+    setEditNotes('')
+    setEditError(null)
+  }
+
+  async function handleEditSave(entry: LogEntryRow) {
+    setIsSaving(true)
+    setEditError(null)
+    try {
+      const res = await fetch('/api/log', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: entry.id, data: editData, notes: editNotes }),
+      })
+      const json = await res.json() as { error?: string }
+      if (!res.ok) {
+        setEditError(json.error ?? 'Failed to save')
+        return
+      }
+      setEditingId(null)
+      router.refresh()
+    } catch {
+      setEditError('Failed to save. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const edit: EditState = {
+    editingId,
+    editData,
+    editNotes,
+    isSaving,
+    editError,
+    setEditData,
+    setEditNotes,
+    onEditStart: handleEditStart,
+    onEditCancel: handleEditCancel,
+    onEditSave: handleEditSave,
+  }
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {
@@ -217,7 +379,7 @@ export function HistoryView({ entries }: HistoryViewProps) {
       ) : (
         <div className="space-y-6">
           {grouped.map(([dateStr, dayEntries]) => (
-            <DateGroup key={dateStr} dateStr={dateStr} entries={dayEntries} detailPrefs={detailPrefs} />
+            <DateGroup key={dateStr} dateStr={dateStr} entries={dayEntries} detailPrefs={detailPrefs} edit={edit} />
           ))}
         </div>
       )}
