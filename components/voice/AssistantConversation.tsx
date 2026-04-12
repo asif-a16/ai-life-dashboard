@@ -102,6 +102,7 @@ export function AssistantConversation({ onClose }: AssistantConversationProps) {
         onModeChange: ({ mode }) => setAgentMode(mode),
         clientTools: {
           query_all_summary: () => callReadTool('query_all_summary'),
+          query_custom_foods: () => callReadTool('query_custom_foods'),
           query_mood_summary: () => callReadTool('query_mood_summary'),
           query_weight_trend: () => callReadTool('query_weight_trend'),
           query_workout_consistency: () => callReadTool('query_workout_consistency'),
@@ -110,7 +111,7 @@ export function AssistantConversation({ onClose }: AssistantConversationProps) {
 
           create_meal_log_draft: (params: Record<string, unknown>) => {
             const result = MealDataSchema.safeParse({
-              description: params.description,
+              description: (params.food_description ?? params.description) as string,
               meal_type: params.meal_type,
               calories: params.calories ?? null,
               protein_g: params.protein_g ?? null,

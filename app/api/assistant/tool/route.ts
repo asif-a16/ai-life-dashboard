@@ -7,6 +7,7 @@ import {
   queryHabitsSummary,
   queryRecentMeals,
   queryAllSummary,
+  queryCustomFoods,
 } from '@/lib/assistant/tools'
 
 const READ_TOOLS = new Set([
@@ -16,6 +17,7 @@ const READ_TOOLS = new Set([
   'query_habits_summary',
   'query_recent_meals',
   'query_all_summary',
+  'query_custom_foods',
 ])
 
 export async function POST(request: NextRequest) {
@@ -52,6 +54,9 @@ export async function POST(request: NextRequest) {
         break
       case 'query_all_summary':
         result = await queryAllSummary(userId, supabase)
+        break
+      case 'query_custom_foods':
+        result = await queryCustomFoods(userId, supabase)
         break
       default:
         return NextResponse.json({ error: `Unknown tool: ${toolName}` }, { status: 400 })

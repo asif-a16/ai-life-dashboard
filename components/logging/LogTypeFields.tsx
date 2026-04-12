@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { LogEntryType } from '@/lib/types'
+import type { LogEntryType, CustomFood } from '@/lib/types'
+import { calcFoodNutrition } from '@/lib/nutrition/recipeCalc'
 
 interface LogTypeFieldsProps {
   type: LogEntryType
@@ -18,14 +20,156 @@ interface LogTypeFieldsProps {
   onChange: (data: Record<string, unknown>) => void
 }
 
+function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onChange: (data: Record<string, unknown>) => void }) {
+  const [foods, setFoods] = useState<CustomFood[]>([])
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const selectedFoodId = value.food_id as string | null | undefined
+
+  useEffect(() => {
+    if (loaded) return
+    fetch('/api/foods')
+      .then((r) => r.json())
+      .then((j: { data?: CustomFood[] }) => { setFoods(j.data ?? []); setLoaded(true) })
+      .catch(() => setLoaded(true))
+  }, [loaded])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = foods.filter((f) =>
+    query.length === 0 ? true : f.name.toLowerCase().includes(query.toLowerCase())
+  )
+
+  function selectFood(food: CustomFood) {
+    const weight = typeof value.weight_g === 'number' && value.weight_g > 0
+      ? (value.weight_g as number)
+      : 100
+    const nutrition = calcFoodNutrition(food, weight)
+    onChange({
+      ...value,
+      food_id: food.id,
+      description: food.name,
+      weight_g: weight,
+      calories: nutrition.calories,
+      protein_g: nutrition.protein_g,
+      fat_g: nutrition.fat_g,
+      carbs_g: nutrition.carbs_g,
+      salt_mg: nutrition.salt_mg,
+    })
+    setQuery('')
+    setOpen(false)
+  }
+
+  function clearFood() {
+    onChange({ ...value, food_id: null, weight_g: null })
+  }
+
+  const selectedFood = foods.find((f) => f.id === selectedFoodId)
+
+  return (
+    <div className="space-y-1.5" ref={containerRef}>
+      <Label>Food (optional)</Label>
+      {selectedFood ? (
+        <div className="flex items-center gap-2 rounded-lg border px-3 py-2 bg-muted/40">
+          <span className="text-sm flex-1">{selectedFood.name}</span>
+          <button
+            type="button"
+            onClick={clearFood}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <Input
+            placeholder="Search saved foods..."
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+            autoComplete="off"
+          />
+          {open && loaded && (
+            <ul className="absolute z-50 mt-1 w-full rounded-lg border bg-popover shadow-md max-h-48 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-muted-foreground">
+                  {foods.length === 0 ? 'No saved foods yet' : 'No matches'}
+                </li>
+              ) : (
+                filtered.map((food) => (
+                  <li key={food.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                      onClick={() => selectFood(food)}
+                    >
+                      <span className="font-medium">{food.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{food.calories_per_100g} kcal/100g</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function LogTypeFields({ type, value, onChange }: LogTypeFieldsProps) {
   function update(key: string, val: unknown) {
     onChange({ ...value, [key]: val })
   }
 
+  function updateWeight(weight_g: number | null) {
+    const food_id = value.food_id as string | null | undefined
+    if (!food_id || weight_g === null) {
+      onChange({ ...value, weight_g })
+      return
+    }
+    // Re-derive nutrition from the stored food when weight changes
+    fetch('/api/foods')
+      .then((r) => r.json())
+      .then((j: { data?: CustomFood[] }) => {
+        const food = (j.data ?? []).find((f) => f.id === food_id)
+        if (!food) { onChange({ ...value, weight_g }); return }
+        const nutrition = calcFoodNutrition(food, weight_g)
+        onChange({ ...value, weight_g, calories: nutrition.calories, protein_g: nutrition.protein_g, fat_g: nutrition.fat_g, carbs_g: nutrition.carbs_g, salt_mg: nutrition.salt_mg })
+      })
+      .catch(() => onChange({ ...value, weight_g }))
+  }
+
   if (type === 'meal') {
     return (
       <div className="space-y-4">
+        <FoodSearch value={value} onChange={onChange} />
+
+        {(value.food_id as string | null | undefined) && (
+          <div className="space-y-1.5">
+            <Label htmlFor="weight_g">Weight (g)</Label>
+            <Input
+              id="weight_g"
+              type="number"
+              min={1}
+              placeholder="e.g. 150"
+              value={(value.weight_g as number) ?? ''}
+              onChange={(e) => updateWeight(e.target.value ? Number(e.target.value) : null)}
+            />
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label htmlFor="description">Description</Label>
           <Input

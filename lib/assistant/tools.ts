@@ -52,6 +52,24 @@ export async function queryRecentMeals(userId: string, supabase: SupabaseClient)
   }
 }
 
+export async function queryCustomFoods(userId: string, supabase: SupabaseClient) {
+  const { data: foods } = await supabase
+    .from('custom_foods')
+    .select('id, name, calories_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g')
+    .eq('user_id', userId)
+    .order('name')
+  return {
+    foods: (foods ?? []).map((f) => ({
+      id: f.id,
+      name: f.name,
+      calories_per_100g: f.calories_per_100g,
+      protein_per_100g: f.protein_per_100g,
+      fat_per_100g: f.fat_per_100g,
+      carbs_per_100g: f.carbs_per_100g,
+    })),
+  }
+}
+
 export async function queryAllSummary(userId: string, supabase: SupabaseClient) {
   const stats = await computeDashboardStats(userId, supabase)
   return {

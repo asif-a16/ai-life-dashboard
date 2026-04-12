@@ -10,6 +10,8 @@ export const MealDataSchema = z.object({
   carbs_g: z.number().nullable().optional(),
   salt_mg: z.number().nullable().optional(),
   meal_type: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
+  food_id: z.string().uuid().nullable().optional(),
+  weight_g: z.number().positive().nullable().optional(),
 })
 
 export const WorkoutDataSchema = z.object({
@@ -217,4 +219,32 @@ export interface AssistantMessage {
 export interface AssistantDraft {
   entry: { type: LogEntryType; data: Record<string, unknown> }
   resolve: (result: { status: 'saved' | 'discarded' | 'error'; message?: string }) => void
+}
+
+// ─── Custom Foods ─────────────────────────────────────────────────────────────
+
+export const CustomFoodSchema = z.object({
+  name: z.string().min(1),
+  calories_per_100g: z.number().nonnegative(),
+  protein_per_100g: z.number().nonnegative().nullable().optional(),
+  fat_per_100g: z.number().nonnegative().nullable().optional(),
+  carbs_per_100g: z.number().nonnegative().nullable().optional(),
+  salt_per_100g: z.number().nonnegative().nullable().optional(),
+})
+
+export const CustomFoodUpdateSchema = CustomFoodSchema.extend({
+  id: z.string().uuid(),
+})
+
+export interface CustomFood {
+  id: string
+  user_id: string
+  name: string
+  calories_per_100g: number
+  protein_per_100g: number | null
+  fat_per_100g: number | null
+  carbs_per_100g: number | null
+  salt_per_100g: number | null
+  created_at: string
+  updated_at: string
 }
