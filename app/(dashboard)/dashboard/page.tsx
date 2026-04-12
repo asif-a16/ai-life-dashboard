@@ -113,7 +113,7 @@ export default async function DashboardPage() {
     isStale = (newerEntries?.length ?? 0) > 0
   }
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'there'
+  const displayName = profile?.display_name?.trim() || 'there'
   const completedTodayIds = new Set((todayLogs ?? []).map((l: { habit_id: string }) => l.habit_id))
   const allLogs = (logs ?? []) as HabitLog[]
 

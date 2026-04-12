@@ -1,6 +1,26 @@
 import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 // These tests run without saved session state (auth project in playwright.config.ts).
+
+async function signInAndLandOnDashboard(page: Page): Promise<void> {
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(process.env.TEST_USER_EMAIL!)
+  await page.getByLabel('Password').fill(process.env.TEST_USER_PASSWORD!)
+
+  const signInButton = page.getByRole('button', { name: /sign in/i })
+  await expect(signInButton).toBeEnabled()
+  await signInButton.click()
+
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 45_000 })
+
+  if (page.url().includes('/onboarding')) {
+    await page.request.patch('/api/profile/onboard')
+    await page.goto('/dashboard')
+  }
+
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 })
+}
 
 test('unauthenticated user is redirected to login', async ({ page }) => {
   await page.goto('/dashboard')
@@ -8,32 +28,13 @@ test('unauthenticated user is redirected to login', async ({ page }) => {
 })
 
 test('user can log in and access dashboard', async ({ page }) => {
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(process.env.TEST_USER_EMAIL!)
-  await page.getByLabel('Password').fill(process.env.TEST_USER_PASSWORD!)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20_000 })
-
-  // Handle onboarding redirect if needed
-  if (page.url().includes('/onboarding')) {
-    await page.request.patch('/api/profile/onboard')
-    await page.goto('/dashboard')
-  }
-
-  await expect(page).toHaveURL(/\/dashboard/)
+  await signInAndLandOnDashboard(page)
   await expect(page.getByRole('navigation')).toBeVisible()
 })
 
 test('user can log out', async ({ page }) => {
-  // Log in first
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(process.env.TEST_USER_EMAIL!)
-  await page.getByLabel('Password').fill(process.env.TEST_USER_PASSWORD!)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20_000 })
-  if (page.url().includes('/onboarding')) {
-    await page.request.patch('/api/profile/onboard')
-  }
+  await signInAndLandOnDashboard(page)
+
   await page.goto('/log')
   await page.locator('html[data-topnav-hydrated="true"]').waitFor({ timeout: 10_000 })
   const signOutRequest = page.waitForRequest(

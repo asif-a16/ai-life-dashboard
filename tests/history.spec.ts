@@ -17,7 +17,12 @@ test.describe('History', () => {
     await page.goto('/log')
     await page.getByRole('tab', { name: 'Meal' }).click()
     await page.getByLabel('Description').fill(description)
+
+    const createEntryResponse = page.waitForResponse(
+      (response) => response.url().includes('/api/log') && response.request().method() === 'POST' && response.ok()
+    )
     await page.getByRole('button', { name: 'Save Entry' }).click()
+    await createEntryResponse
     await expect(page.getByText('Entry saved')).toBeVisible()
 
     // Verify it appears in history
@@ -31,15 +36,25 @@ test.describe('History', () => {
     await page.goto('/log')
     await page.getByRole('tab', { name: 'Meal' }).click()
     await page.getByLabel('Description').fill(description)
+
+    const createEntryResponse = page.waitForResponse(
+      (response) => response.url().includes('/api/log') && response.request().method() === 'POST' && response.ok()
+    )
     await page.getByRole('button', { name: 'Save Entry' }).click()
+    await createEntryResponse
     await expect(page.getByText('Entry saved')).toBeVisible()
 
     await page.goto('/history')
-    await expect(page.getByText(description)).toBeVisible()
+    const entryRows = page.locator('li').filter({ hasText: description })
+    await expect(entryRows).toHaveCount(1)
 
     // Delete it
-    const entryRow = page.locator('li, [data-entry]').filter({ hasText: description }).first()
+    const deleteEntryResponse = page.waitForResponse(
+      (response) => response.url().includes('/api/log?id=') && response.request().method() === 'DELETE' && response.ok()
+    )
+    const entryRow = entryRows.first()
     await entryRow.getByRole('button', { name: /delete/i }).click()
-    await expect(page.getByText(description)).not.toBeVisible()
+    await deleteEntryResponse
+    await expect(entryRows).toHaveCount(0, { timeout: 15_000 })
   })
 })

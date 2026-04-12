@@ -210,6 +210,11 @@ export interface Profile {
   updated_at: string
 }
 
+export const ProfileUpdateSchema = z.object({
+  display_name: z.string().trim().min(1).max(60),
+})
+export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>
+
 // ─── Assistant (Conversational AI) ───────────────────────────────────────────
 
 export interface AssistantMessage {
