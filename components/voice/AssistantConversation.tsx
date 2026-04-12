@@ -109,6 +109,7 @@ export function AssistantConversation({ onClose }: AssistantConversationProps) {
         },
         onModeChange: ({ mode }) => setAgentMode(mode),
         clientTools: {
+          query_all_summary: () => callReadTool('query_all_summary'),
           query_mood_summary: () => callReadTool('query_mood_summary'),
           query_weight_trend: () => callReadTool('query_weight_trend'),
           query_workout_consistency: () => callReadTool('query_workout_consistency'),

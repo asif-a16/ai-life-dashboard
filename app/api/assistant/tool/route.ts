@@ -6,6 +6,7 @@ import {
   queryWorkoutConsistency,
   queryHabitsSummary,
   queryRecentMeals,
+  queryAllSummary,
 } from '@/lib/assistant/tools'
 
 const READ_TOOLS = new Set([
@@ -14,6 +15,7 @@ const READ_TOOLS = new Set([
   'query_workout_consistency',
   'query_habits_summary',
   'query_recent_meals',
+  'query_all_summary',
 ])
 
 export async function POST(request: NextRequest) {
@@ -47,6 +49,9 @@ export async function POST(request: NextRequest) {
         break
       case 'query_recent_meals':
         result = await queryRecentMeals(userId, supabase)
+        break
+      case 'query_all_summary':
+        result = await queryAllSummary(userId, supabase)
         break
       default:
         return NextResponse.json({ error: `Unknown tool: ${toolName}` }, { status: 400 })

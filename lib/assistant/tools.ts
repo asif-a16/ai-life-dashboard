@@ -51,3 +51,43 @@ export async function queryRecentMeals(userId: string, supabase: SupabaseClient)
       : null,
   }
 }
+
+export async function queryAllSummary(userId: string, supabase: SupabaseClient) {
+  const stats = await computeDashboardStats(userId, supabase)
+  return {
+    period_days: 7,
+    mood: {
+      avg_score: stats.mood.avg !== null ? Math.round(stats.mood.avg * 10) / 10 : null,
+      avg_energy: stats.mood.energyAvg !== null ? Math.round(stats.mood.energyAvg * 10) / 10 : null,
+      entry_count: stats.logCounts.mood,
+    },
+    bodyweight: {
+      first_kg: stats.bodyweight.first,
+      last_kg: stats.bodyweight.last,
+      delta_kg: stats.bodyweight.delta !== null ? Math.round(stats.bodyweight.delta * 100) / 100 : null,
+      entry_count: stats.logCounts.bodyweight,
+    },
+    workout: {
+      count: stats.workout.count,
+      total_minutes: stats.workout.totalMinutes,
+    },
+    nutrition: {
+      meal_count: stats.logCounts.meal,
+      total_calories: stats.calories.totalLogged,
+      avg_protein_g: stats.calories.avgProteinPerDay !== null
+        ? Math.round(stats.calories.avgProteinPerDay * 10) / 10
+        : null,
+    },
+    habits: stats.habits.map(h => ({
+      name: h.name,
+      completed_this_week: h.completedThisWeek,
+      current_streak: h.currentStreak,
+    })),
+    reflection_count: stats.reflectionCount,
+    upcoming_events: stats.upcomingEvents.map(e => ({
+      title: e.title,
+      start_at: e.start_at,
+      location: e.location,
+    })),
+  }
+}
