@@ -1,211 +1,271 @@
 # AI Life Dashboard
 
-A personal health and wellness tracker where you log meals, workouts, bodyweight, mood, habits, and reflections — by voice or text. The system stores structured data over time and uses AI to generate weekly narrative insights delivered as spoken audio.
+AI Life Dashboard is a personal health tracker where you log meals, workouts, bodyweight, mood, and reflections by text or voice, then get a weekly spoken summary from your own data.
 
-**Demo story:** Speak a meal into the mic → entry is parsed and saved → AI reads back a personalized weekly summary in a spoken voice.
-
----
+Demo loop: log -> store -> analyze -> speak.
 
 ## Key Features
 
-- **Voice logging** — speak any entry type; ElevenLabs transcribes, Claude (or keyword matcher) extracts structured data, confirmation card lets you edit before saving
-- **Text logging** — tabbed form for all 5 entry types: meal, workout, bodyweight, mood, reflection
-- **Habit tracking** — daily check-in, streak computation, compact dashboard view
-- **AI insights** — weekly narrative summary generated from your real data, spoken aloud via ElevenLabs TTS
-- **Dual-mode AI** — runs fully without an Anthropic key using deterministic template summaries; upgrades to LLM narratives when `ANTHROPIC_API_KEY` is present
-- **Calendar import** — upload `.ics` files, upcoming events appear in insight context
-- **Supabase-backed** — Postgres with RLS, all data isolated per user
+- Voice logging with edit-before-save confirmation
+  - Record in the browser, transcribe with ElevenLabs STT, parse into structured fields, review, then save.
+- Conversational voice assistant
+  - Ask questions about your data and draft log entries through a voice/chat assistant flow.
+- Structured logging + history
+  - Track 5 core entry types: meal, workout, bodyweight, mood, reflection.
+  - Browse and manage entries on a dedicated history page.
+- Foods and recipes
+  - Maintain a custom food library with nutrition values.
+  - Build recipes (including sub-recipes) and reuse them in meal logging.
+- Habit tracking
+  - Daily check-offs with streak calculations.
+- AI insights (dual mode)
+  - Works without Anthropic: deterministic smart summary.
+  - Upgrades automatically with Anthropic key: LLM-generated narrative.
+  - Both modes support spoken playback via ElevenLabs TTS.
+- Calendar-aware context
+  - Import ICS events and include upcoming schedule context in insights.
+- Customizable dashboard
+  - Toggle/reorder widgets and control detail level for entry cards.
+- Analytics tools
+  - Bodyweight trend chart, macro pie chart, and weight CSV import/export.
 
----
+## Current Scope (And What Is Not Supported)
+
+- Supported:
+  - Email/password auth, onboarding, dashboard pages, foods/recipes, habits, insights, voice features, ICS import.
+- Not supported:
+  - Outlook PST import.
+  - Recurring ICS events (RRULE) ingestion.
+  - Manual calendar event creation/editing in the app.
+  - Mobile-native app clients.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 16, App Router, TypeScript (strict) |
-| Styling | Tailwind CSS v4, shadcn/ui |
-| Database | Supabase (PostgreSQL + Auth + Storage + RLS) |
-| Voice input | ElevenLabs STT (`scribe_v1` model) |
-| Voice output | ElevenLabs TTS (`eleven_turbo_v2` model) |
-| AI narratives | Anthropic `claude-sonnet-4-6` (optional — mock used if absent) |
-| AI transcript parsing | Anthropic `claude-sonnet-4-6` (optional — keyword matcher if absent) |
+| Framework | Next.js 16 (App Router), TypeScript |
+| UI | Tailwind CSS v4, shadcn/ui |
+| Data/Auth | Supabase Postgres + Auth + Storage + RLS |
+| Voice STT | ElevenLabs `scribe_v1` |
+| Voice TTS | ElevenLabs `eleven_turbo_v2` |
+| AI (optional) | Anthropic `claude-sonnet-4-6` |
 | Validation | Zod |
-| Testing | Playwright (E2E) |
-| Deployment | Vercel |
+| Charts | Recharts |
+| Testing | Playwright E2E |
+| Deploy | Vercel |
 
----
+## Architecture Snapshot
 
-## Architecture
-
-```
+```text
 Browser
-  ├── Server Components   — page shells, data fetching via Supabase server client
-  ├── Client Components   — forms, VoiceRecorder, InsightPlayer
-  └── Route Handlers (app/api/*)
-        ├── /api/log                POST, DELETE
-        ├── /api/habits             GET, POST, DELETE
-        ├── /api/habits/check       POST (toggle habit_log)
-        ├── /api/calendar           GET, POST (ICS import)
-        ├── /api/insights           GET (cached), POST (generate pipeline)
-        ├── /api/voice/stt          POST → parsed entry JSON (does NOT save to DB)
-        └── /api/seed               POST (demo data)
+  - Server Components for data loading
+  - Client Components for interaction (forms, recorder, assistant, player)
+  - Route Handlers in app/api/*
 
 Supabase
-  ├── Auth (email/password)
-  ├── PostgreSQL (6 tables, RLS on all)
-  └── Storage (bucket: insight-audio, public read)
+  - Auth (email/password)
+  - Postgres (RLS-protected tables)
+  - Storage (insight audio)
 
-External APIs — server-side only
-  ├── ElevenLabs /v1/speech-to-text   (STT, always required)
-  ├── ElevenLabs /v1/text-to-speech   (TTS, always required)
-  └── Anthropic claude-sonnet-4-6     (optional — mock mode if absent)
+External APIs (server-side only)
+  - ElevenLabs STT + TTS
+  - Anthropic (optional)
 ```
 
-### Key Architecture Decisions
+The app uses runtime dual-mode AI:
+- No `ANTHROPIC_API_KEY`: template summaries + keyword parsing.
+- With `ANTHROPIC_API_KEY`: LLM insights + richer transcript extraction.
 
-- **Polymorphic `log_entries` table** — one table for all 5 entry types with a JSONB `data` column. Zod validates structure at the API boundary.
-- **Voice pipeline does not auto-save** — `/api/voice/stt` returns a parsed entry to the browser for user confirmation. The browser then calls `POST /api/log`.
-- **On-demand insight generation with DB cache** — no cron jobs. Results cached for 24 hours in `insights_cache`. Audio stored in Supabase Storage.
-- **Dual-mode AI** — `lib/ai/insightEngine.ts` and `lib/voice/transcriptParser.ts` check `ANTHROPIC_API_KEY` at runtime and delegate to LLM or mock. Callers never branch on the key themselves.
+## API Surface
 
----
+### Core logging and dashboard
+- `POST, PATCH, DELETE /api/log`
+- `POST /api/log/import/weight`
+- `GET /api/log/export/weight`
+- `GET, POST, DELETE /api/habits`
+- `POST /api/habits/check`
+- `GET, POST /api/calendar`
+- `GET, POST /api/insights`
+- `GET /api/health`
+- `POST /api/seed`
 
-## Dual-Mode AI System
+### Foods and recipes
+- `GET, POST, PATCH, DELETE /api/foods`
+- `POST /api/foods/recalculate`
+- `GET, POST, PATCH, DELETE /api/recipes`
+- `POST /api/recipes/recalculate`
+- `POST, DELETE /api/recipes/ingredients`
 
-The app runs fully without an Anthropic API key. When the key is absent, it uses:
-- **Template-based narratives** — 3–4 sentence paragraph with real stats values, deterministic suggestion rotation
-- **Keyword-based transcript parsing** — regex matching for common voice patterns (meals, workouts, bodyweight, mood)
+### Voice and assistant
+- `POST /api/voice/stt`
+- `POST /api/voice/ask`
+- `POST /api/voice/session`
+- `POST /api/assistant/tool`
 
-When `ANTHROPIC_API_KEY` is set, it automatically upgrades to:
-- **LLM narratives** — `claude-sonnet-4-6` with wellness coach system prompt, under 250 words
-- **Claude-backed extraction** — structured JSON from free-form voice transcripts, with Zod validation
-
-Both modes feed into the same ElevenLabs TTS pipeline and produce spoken audio. The UI shows "Smart Summary" or "AI Insight" badge to indicate which mode was used.
-
----
-
-## Voice Architecture
-
-1. `VoiceRecorder.tsx` captures audio via `MediaRecorder` (`audio/webm;codecs=opus`)
-2. On stop: POST audio blob as `FormData` to `/api/voice/stt`
-3. Route handler: ElevenLabs STT → transcript string
-4. Route handler: `transcriptParser.ts` → Claude or keyword matcher → `ParsedLogEntry`
-5. Returns `{ parsedEntry, transcript }` to browser — **no DB write yet**
-6. Browser shows confirmation card with editable fields
-7. User confirms → `POST /api/log` saves entry with `voice_transcript`
-
----
+### Profile and auth utilities
+- `PATCH /api/profile/onboard`
+- `POST /api/auth/signout`
 
 ## Environment Variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `ELEVENLABS_API_KEY` | Yes | ElevenLabs STT + TTS |
-| `ELEVENLABS_VOICE_ID` | Yes | ElevenLabs TTS voice |
-| `ANTHROPIC_API_KEY` | No | Claude — if absent, mock mode is used |
-| `NEXT_PUBLIC_DEMO_MODE` | No | Set `true` to show "Seed Demo Data" button |
+### Runtime (required)
 
----
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase browser anon key |
+| `ELEVENLABS_API_KEY` | ElevenLabs STT and TTS |
+| `ELEVENLABS_VOICE_ID` | ElevenLabs voice used for insights |
+
+### Runtime (optional)
+
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Enables LLM insight + transcript parsing mode |
+| `ELEVENLABS_AGENT_ID` | Enables conversational assistant session endpoint |
+| `NEXT_PUBLIC_DEMO_MODE` | Shows seed demo data action in UI |
+
+### Testing (required for Playwright global setup)
+
+| Variable | Purpose |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | Creates/verifies test user in global setup |
+| `TEST_USER_EMAIL` | E2E login identity |
+| `TEST_USER_PASSWORD` | E2E login password |
+
+Use [.env.local.example](.env.local.example) as the base runtime template.
 
 ## Local Setup
 
 ### Prerequisites
 - Node.js 18+
-- A Supabase project (see [Supabase Setup](#supabase-setup))
-- ElevenLabs account with API key and a voice ID
+- Supabase project
+- ElevenLabs API key and voice ID
 
-### Steps
+### 1. Install dependencies
 
 ```bash
-# 1. Clone and install
-git clone <repo-url>
-cd ai-life-dashboard
 npm install
+```
 
-# 2. Copy and fill environment variables
+### 2. Configure runtime env
+
+Bash:
+
+```bash
 cp .env.local.example .env.local
-# Edit .env.local with your keys
+```
 
-# 3. Run the dev server
+PowerShell:
+
+```powershell
+Copy-Item .env.local.example .env.local
+```
+
+Then fill `.env.local` with required values.
+
+### 3. Apply database migrations
+
+Run migration SQL files in order from [supabase/migrations](supabase/migrations):
+
+1. `001_initial_schema.sql`
+2. `002_onboarding.sql`
+3. `003_calendar_source.sql`
+4. `004_custom_foods.sql`
+5. `005_recipes.sql`
+
+### 4. Create storage bucket
+
+In Supabase Storage, create bucket `insight-audio` with public read enabled.
+
+### 5. Start the app
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). You'll be redirected to `/login`.
+Open `http://localhost:3000`.
 
-### Supabase Setup
+## Running Tests (Playwright)
 
-1. Create a Supabase project at https://supabase.com
-2. Go to **SQL Editor** and run the full contents of `supabase/migrations/001_initial_schema.sql`
-3. Run this additional migration if not already present:
-   ```sql
-   ALTER TABLE public.insights_cache ADD COLUMN IF NOT EXISTS insight_mode text NOT NULL DEFAULT 'mock';
-   ```
-4. Go to **Storage** → **New bucket**: name `insight-audio`, Public: **on**
-5. Copy your project URL and keys into `.env.local`
+The E2E suite runs against local `next dev` via Playwright webServer config and uses a global setup that logs in and stores session state.
 
----
-
-## Vercel Deployment
-
-See [docs/deploy-checklist.md](docs/deploy-checklist.md) for a full step-by-step guide.
-
-Quick version:
-1. Push repo to GitHub
-2. Import project at https://vercel.com
-3. Add all environment variables in Vercel project settings
-4. Deploy
-
----
-
-## Running Tests
+### 1. Install browser (first time)
 
 ```bash
-# Install Playwright browsers (first time only)
 npx playwright install chromium
+```
 
-# Create test env file
-cp .env.test.local.example .env.test.local
-# Fill in TEST_USER_EMAIL and TEST_USER_PASSWORD
+### 2. Create test env file
 
-# Run E2E tests
+Create `.env.test.local` with:
+
+```env
+TEST_USER_EMAIL=
+TEST_USER_PASSWORD=
+```
+
+Also ensure `.env.local` contains `SUPABASE_SERVICE_ROLE_KEY` for test user bootstrap.
+
+### 3. Run tests
+
+```bash
 npm run test:e2e
+```
 
-# Open Playwright UI
+### 4. Open Playwright UI mode
+
+```bash
 npm run test:e2e:ui
 ```
 
-Tests run against `next dev` on localhost. External APIs (ElevenLabs, Anthropic) are mocked via `page.route()` — no real API calls during test runs.
+### Useful targeted runs
 
----
+```bash
+npx playwright test tests/auth.spec.ts
+npx playwright test --project auth
+npx playwright test --project authenticated
+```
+
+Notes:
+- First run creates `tests/.auth/user.json` from global setup.
+- Test artifacts live in `test-results/` and `playwright-report/` and are gitignored.
 
 ## Project Structure
 
-```
+```text
 app/
-  (auth)/login, signup       — auth pages
-  (dashboard)/
-    dashboard/               — main dashboard
-    log/                     — text + voice logging
-    habits/                  — habit CRUD + check-in
-    calendar/                — ICS import + event list
-  api/
-    log, habits, calendar, insights, voice/stt, seed
+  (auth)/                 login/signup
+  (dashboard)/            dashboard, log, habits, calendar, history, foods, recipes
+  onboarding/             multi-step onboarding flow
+  api/                    route handlers (log, habits, calendar, insights, voice, foods, recipes, etc.)
 
 components/
-  layout/   Sidebar, TopNav (+ voice trigger)
-  logging/  LogEntryForm, LogTypeFields, RecentLogList
-  habits/   HabitCard, TodayHabitChecklist
-  voice/    VoiceRecorder, InsightPlayer
-  insights/ InsightCard, DeterministicStats
+  dashboard/              layout + customization
+  logging/                entry forms, recent logs, history UI
+  voice/                  recorder, assistant conversation, insight player
+  foods/                  food library UI
+  recipes/                recipe builder/library UI
+  charts/                 bodyweight + macro visualizations
 
 lib/
-  supabase/   client.ts, server.ts
-  ai/         computeStats, insightEngine, mockNarrativeGenerator,
-              llmNarrativeGenerator, buildInsightPrompt
-  voice/      elevenLabsSTT, elevenLabsTTS, transcriptParser,
-              mockTranscriptParser, llmTranscriptParser
-  calendar/   parseICS
-  types.ts    — single source of truth for all types + Zod schemas
+  ai/                     stats + narrative engines
+  voice/                  STT/TTS + transcript parsing
+  nutrition/              recipe and macro calculation
+  calendar/               ICS parsing
+  supabase/               browser/server clients
+  types.ts                shared types + zod schemas
+
+tests/
+  global.setup.ts         creates/authenticates test user session
+  *.spec.ts               end-to-end specs by feature domain
 ```
+
+## Deployment
+
+For deployment steps and checks, see [docs/deploy-checklist.md](docs/deploy-checklist.md).
+
+## Additional Documentation
+
+- [CLAUDE.md](CLAUDE.md): architecture decisions, constraints, and coding workflow.
+- [docs/implementation-plan.md](docs/implementation-plan.md): implementation history and simplifications.
