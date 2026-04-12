@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -13,9 +14,17 @@ interface TopNavProps {
 export function TopNav({ title }: TopNavProps) {
   const router = useRouter()
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-topnav-hydrated', 'true')
+    return () => {
+      document.documentElement.removeAttribute('data-topnav-hydrated')
+    }
+  }, [])
+
   async function handleSignOut() {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await fetch('/api/auth/signout', { method: 'POST' })
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/login')
     router.refresh()
   }
@@ -28,6 +37,7 @@ export function TopNav({ title }: TopNavProps) {
         <Button
           variant="ghost"
           size="sm"
+          data-testid="topnav-signout"
           onClick={handleSignOut}
           className="text-muted-foreground hover:text-foreground"
         >

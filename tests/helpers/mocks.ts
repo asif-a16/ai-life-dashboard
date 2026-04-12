@@ -30,13 +30,15 @@ export async function setupApiMocks(page: Page) {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          insight: {
-            stats_json: {},
-            narrative: 'You had a solid week. Keep it up.',
-            audio_url: null,
-            insight_mode: 'mock',
+          data: {
+            insight: {
+              stats_json: {},
+              narrative: 'You had a solid week. Keep it up.',
+              audio_url: null,
+              insight_mode: 'mock',
+            },
+            isStale: false,
           },
-          isStale: false,
         }),
       })
     } else {
