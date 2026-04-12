@@ -11,6 +11,7 @@ export const MealDataSchema = z.object({
   salt_mg: z.number().nullable().optional(),
   meal_type: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
   food_id: z.string().uuid().nullable().optional(),
+  recipe_id: z.string().uuid().nullable().optional(),
   weight_g: z.number().positive().nullable().optional(),
 })
 
@@ -247,4 +248,39 @@ export interface CustomFood {
   salt_per_100g: number | null
   created_at: string
   updated_at: string
+}
+
+// ─── Recipes ──────────────────────────────────────────────────────────────────
+
+export const RecipeSchema = z.object({
+  name: z.string().min(1),
+  total_weight_g: z.number().positive(),
+})
+
+export const RecipeUpdateSchema = RecipeSchema.extend({
+  id: z.string().uuid(),
+})
+
+export const RecipeIngredientCreateSchema = z.object({
+  recipe_id: z.string().uuid(),
+  food_id: z.string().uuid().nullable().optional(),
+  sub_recipe_id: z.string().uuid().nullable().optional(),
+  weight_g: z.number().positive(),
+})
+
+export interface Recipe {
+  id: string
+  user_id: string
+  name: string
+  total_weight_g: number
+  created_at: string
+  updated_at: string
+}
+
+export interface RecipeIngredient {
+  id: string
+  recipe_id: string
+  food_id: string | null
+  sub_recipe_id: string | null
+  weight_g: number
 }

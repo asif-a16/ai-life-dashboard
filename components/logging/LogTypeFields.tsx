@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -12,7 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { LogEntryType, CustomFood } from '@/lib/types'
-import { calcFoodNutrition } from '@/lib/nutrition/recipeCalc'
+import { calcFoodNutrition, calcRecipeNutrition } from '@/lib/nutrition/recipeCalc'
+import type { NutritionPer100g } from '@/lib/nutrition/recipeCalc'
 
 interface LogTypeFieldsProps {
   type: LogEntryType
@@ -20,20 +22,30 @@ interface LogTypeFieldsProps {
   onChange: (data: Record<string, unknown>) => void
 }
 
+interface RecipeSearchResult {
+  id: string
+  name: string
+  nutrition_per_100g: NutritionPer100g | null
+}
+
 function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onChange: (data: Record<string, unknown>) => void }) {
   const [foods, setFoods] = useState<CustomFood[]>([])
+  const [recipes, setRecipes] = useState<RecipeSearchResult[]>([])
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const selectedFoodId = value.food_id as string | null | undefined
+  const selectedRecipeId = value.recipe_id as string | null | undefined
 
   useEffect(() => {
     if (loaded) return
-    fetch('/api/foods')
-      .then((r) => r.json())
-      .then((j: { data?: CustomFood[] }) => { setFoods(j.data ?? []); setLoaded(true) })
+    Promise.all([
+      fetch('/api/foods').then((r) => r.json()).then((j: { data?: CustomFood[] }) => j.data ?? []),
+      fetch('/api/recipes').then((r) => r.json()).then((j: { data?: RecipeSearchResult[] }) => j.data ?? []),
+    ])
+      .then(([f, r]) => { setFoods(f); setRecipes(r); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [loaded])
 
@@ -47,8 +59,11 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const filtered = foods.filter((f) =>
+  const filteredFoods = foods.filter((f) =>
     query.length === 0 ? true : f.name.toLowerCase().includes(query.toLowerCase())
+  )
+  const filteredRecipes = recipes.filter((r) =>
+    query.length === 0 ? true : r.name.toLowerCase().includes(query.toLowerCase())
   )
 
   function selectFood(food: CustomFood) {
@@ -59,6 +74,7 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
     onChange({
       ...value,
       food_id: food.id,
+      recipe_id: null,
       description: food.name,
       weight_g: weight,
       calories: nutrition.calories,
@@ -71,21 +87,47 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
     setOpen(false)
   }
 
-  function clearFood() {
-    onChange({ ...value, food_id: null, weight_g: null })
+  function selectRecipe(recipe: RecipeSearchResult) {
+    const weight = typeof value.weight_g === 'number' && value.weight_g > 0
+      ? (value.weight_g as number)
+      : 100
+    const nutrition = recipe.nutrition_per_100g
+      ? calcRecipeNutrition(recipe.nutrition_per_100g, weight)
+      : { calories: null, protein_g: null, fat_g: null, carbs_g: null, salt_mg: null }
+    onChange({
+      ...value,
+      recipe_id: recipe.id,
+      food_id: null,
+      description: recipe.name,
+      weight_g: weight,
+      calories: nutrition.calories,
+      protein_g: nutrition.protein_g,
+      fat_g: nutrition.fat_g,
+      carbs_g: nutrition.carbs_g,
+      salt_mg: nutrition.salt_mg,
+    })
+    setQuery('')
+    setOpen(false)
+  }
+
+  function clearSelection() {
+    onChange({ ...value, food_id: null, recipe_id: null, weight_g: null })
   }
 
   const selectedFood = foods.find((f) => f.id === selectedFoodId)
+  const selectedRecipe = recipes.find((r) => r.id === selectedRecipeId)
+  const selectedName = selectedFood?.name ?? selectedRecipe?.name
 
   return (
     <div className="space-y-1.5" ref={containerRef}>
-      <Label>Food (optional)</Label>
-      {selectedFood ? (
+      <Label>Food or recipe (optional)</Label>
+      {selectedName ? (
         <div className="flex items-center gap-2 rounded-lg border px-3 py-2 bg-muted/40">
-          <span className="text-sm flex-1">{selectedFood.name}</span>
+          <span className="text-sm flex-1">{selectedName}</span>
+          {selectedRecipe && <Badge variant="secondary" className="text-xs shrink-0">Recipe</Badge>}
           <button
             type="button"
-            onClick={clearFood}
+            onClick={clearSelection}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             Clear
@@ -94,7 +136,7 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
       ) : (
         <div className="relative">
           <Input
-            placeholder="Search saved foods..."
+            placeholder="Search foods and recipes..."
             value={query}
             onFocus={() => setOpen(true)}
             onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
@@ -102,23 +144,42 @@ function FoodSearch({ value, onChange }: { value: Record<string, unknown>; onCha
           />
           {open && loaded && (
             <ul className="absolute z-50 mt-1 w-full rounded-lg border bg-popover shadow-md max-h-48 overflow-y-auto">
-              {filtered.length === 0 ? (
+              {filteredFoods.length === 0 && filteredRecipes.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-muted-foreground">
-                  {foods.length === 0 ? 'No saved foods yet' : 'No matches'}
+                  {foods.length === 0 && recipes.length === 0 ? 'No saved foods or recipes yet' : 'No matches'}
                 </li>
               ) : (
-                filtered.map((food) => (
-                  <li key={food.id}>
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                      onClick={() => selectFood(food)}
-                    >
-                      <span className="font-medium">{food.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">{food.calories_per_100g} kcal/100g</span>
-                    </button>
-                  </li>
-                ))
+                <>
+                  {filteredFoods.map((food) => (
+                    <li key={`food-${food.id}`}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                        onClick={() => selectFood(food)}
+                      >
+                        <span className="font-medium">{food.name}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{food.calories_per_100g} kcal/100g</span>
+                      </button>
+                    </li>
+                  ))}
+                  {filteredRecipes.map((recipe) => (
+                    <li key={`recipe-${recipe.id}`}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
+                        onClick={() => selectRecipe(recipe)}
+                      >
+                        <span className="font-medium flex-1">{recipe.name}</span>
+                        <Badge variant="secondary" className="text-xs shrink-0">Recipe</Badge>
+                        {recipe.nutrition_per_100g && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {recipe.nutrition_per_100g.calories_per_100g} kcal/100g
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </>
               )}
             </ul>
           )}
@@ -135,28 +196,46 @@ export function LogTypeFields({ type, value, onChange }: LogTypeFieldsProps) {
 
   function updateWeight(weight_g: number | null) {
     const food_id = value.food_id as string | null | undefined
-    if (!food_id || weight_g === null) {
+    const recipe_id = value.recipe_id as string | null | undefined
+
+    if (weight_g === null) {
       onChange({ ...value, weight_g })
       return
     }
-    // Re-derive nutrition from the stored food when weight changes
-    fetch('/api/foods')
-      .then((r) => r.json())
-      .then((j: { data?: CustomFood[] }) => {
-        const food = (j.data ?? []).find((f) => f.id === food_id)
-        if (!food) { onChange({ ...value, weight_g }); return }
-        const nutrition = calcFoodNutrition(food, weight_g)
-        onChange({ ...value, weight_g, calories: nutrition.calories, protein_g: nutrition.protein_g, fat_g: nutrition.fat_g, carbs_g: nutrition.carbs_g, salt_mg: nutrition.salt_mg })
-      })
-      .catch(() => onChange({ ...value, weight_g }))
+
+    if (food_id) {
+      fetch('/api/foods')
+        .then((r) => r.json())
+        .then((j: { data?: CustomFood[] }) => {
+          const food = (j.data ?? []).find((f) => f.id === food_id)
+          if (!food) { onChange({ ...value, weight_g }); return }
+          const nutrition = calcFoodNutrition(food, weight_g)
+          onChange({ ...value, weight_g, calories: nutrition.calories, protein_g: nutrition.protein_g, fat_g: nutrition.fat_g, carbs_g: nutrition.carbs_g, salt_mg: nutrition.salt_mg })
+        })
+        .catch(() => onChange({ ...value, weight_g }))
+    } else if (recipe_id) {
+      fetch('/api/recipes')
+        .then((r) => r.json())
+        .then((j: { data?: RecipeSearchResult[] }) => {
+          const recipe = (j.data ?? []).find((r) => r.id === recipe_id)
+          if (!recipe?.nutrition_per_100g) { onChange({ ...value, weight_g }); return }
+          const nutrition = calcRecipeNutrition(recipe.nutrition_per_100g, weight_g)
+          onChange({ ...value, weight_g, calories: nutrition.calories, protein_g: nutrition.protein_g, fat_g: nutrition.fat_g, carbs_g: nutrition.carbs_g, salt_mg: nutrition.salt_mg })
+        })
+        .catch(() => onChange({ ...value, weight_g }))
+    } else {
+      onChange({ ...value, weight_g })
+    }
   }
 
   if (type === 'meal') {
+    const hasSelection = !!(value.food_id as string | null | undefined) || !!(value.recipe_id as string | null | undefined)
+
     return (
       <div className="space-y-4">
         <FoodSearch value={value} onChange={onChange} />
 
-        {(value.food_id as string | null | undefined) && (
+        {hasSelection && (
           <div className="space-y-1.5">
             <Label htmlFor="weight_g">Weight (g)</Label>
             <Input

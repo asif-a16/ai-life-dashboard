@@ -82,7 +82,7 @@ export function BodyweightChart({ entries }: BodyweightChartProps) {
               contentStyle={{ fontSize: 12 }}
             />
             <Line
-              type="monotone"
+              type="linear"
               dataKey="weight"
               strokeWidth={2}
               dot={points.length <= 14}

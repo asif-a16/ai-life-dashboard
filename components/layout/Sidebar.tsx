@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, ClipboardList, CheckSquare, Calendar, History, Utensils, Menu, X } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, CheckSquare, Calendar, History, Utensils, ChefHat, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navLinks = [
@@ -13,6 +13,7 @@ const navLinks = [
   { href: '/habits', label: 'Habits', icon: CheckSquare },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/foods', label: 'Foods', icon: Utensils },
+  { href: '/recipes', label: 'Recipes', icon: ChefHat },
 ]
 
 export function Sidebar() {
