@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react'
 import { Mic, X } from 'lucide-react'
 import { VoiceRecorder } from './VoiceRecorder'
+import { AssistantConversation } from './AssistantConversation'
 
-export function VoiceFab() {
+interface VoiceFabProps {
+  hasAssistant: boolean
+}
+
+export function VoiceFab({ hasAssistant }: VoiceFabProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -32,11 +37,14 @@ export function VoiceFab() {
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />
-          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-background border-t max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-background border-t max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
             style={{ boxShadow: 'var(--shadow-lg)' }}
           >
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <h2 className="font-semibold text-base tracking-tight">Voice Log</h2>
+              <h2 className="font-semibold text-base tracking-tight">
+                {hasAssistant ? 'Voice Assistant' : 'Voice Log'}
+              </h2>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-muted-foreground hover:text-foreground rounded-lg p-1"
@@ -46,7 +54,11 @@ export function VoiceFab() {
               </button>
             </div>
             <div className="px-5 pb-8">
-              <VoiceRecorder onDone={() => setIsOpen(false)} />
+              {hasAssistant ? (
+                <AssistantConversation />
+              ) : (
+                <VoiceRecorder onDone={() => setIsOpen(false)} />
+              )}
             </div>
           </div>
         </>

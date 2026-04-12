@@ -206,3 +206,15 @@ export interface Profile {
   created_at: string
   updated_at: string
 }
+
+// ─── Assistant (Conversational AI) ───────────────────────────────────────────
+
+export interface AssistantMessage {
+  source: 'user' | 'agent'
+  text: string
+}
+
+export interface AssistantDraft {
+  entry: { type: LogEntryType; data: Record<string, unknown> }
+  resolve: (result: { status: 'saved' | 'discarded' | 'error'; message?: string }) => void
+}
